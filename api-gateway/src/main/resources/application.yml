@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+        - id: ecofy-catalog
+          uri: http://localhost:8081  # ms-catalog
+          predicates:
+            - Path=/api/catalog/**
+
+        - id: ecofy-pricing
+          uri: http://localhost:8082  # ms-pricing
+          predicates:
+            - Path=/api/pricing/**
+
+        - id: ecofy-eco-ingestion
+          uri: http://localhost:8091  # ECO-ING
+          predicates:
+            - Path=/eco/ingestion/**
+
+        - id: ecofy-eco-users
+          uri: http://localhost:8096  # ECO-USR
+          predicates:
+            - Path=/eco/users/**
+
+      default-filters:
+        - RemoveRequestHeader=Cookie
+        - PreserveHostHeader
