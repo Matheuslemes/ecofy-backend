@@ -5,29 +5,57 @@ spring:
   application:
     name: api-gateway
 
+  # H2 em memória só pra agradar o JPA/DataSource
+  datasource:
+    url: jdbc:h2:mem:gatewaydb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
   cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+
     gateway:
-      routes:
-        - id: ecofy-catalog
-          uri: http://localhost:8081  # ms-catalog
-          predicates:
-            - Path=/api/catalog/**
+      server:
+        webflux:
+          routes:
+            - id: ecofy-catalog
+              uri: http://localhost:8081   # ms-catalog
+              predicates:
+                - Path=/api/catalog/**
 
-        - id: ecofy-pricing
-          uri: http://localhost:8082  # ms-pricing
-          predicates:
-            - Path=/api/pricing/**
+            - id: ecofy-pricing
+              uri: http://localhost:8082   # ms-pricing
+              predicates:
+                - Path=/api/pricing/**
 
-        - id: ecofy-eco-ingestion
-          uri: http://localhost:8091  # ECO-ING
-          predicates:
-            - Path=/eco/ingestion/**
+            - id: ecofy-eco-ingestion
+              uri: http://localhost:8091   # ECO-ING
+              predicates:
+                - Path=/eco/ingestion/**
 
-        - id: ecofy-eco-users
-          uri: http://localhost:8096  # ECO-USR
-          predicates:
-            - Path=/eco/users/**
+            - id: ecofy-eco-users
+              uri: http://localhost:8096   # ECO-USR
+              predicates:
+                - Path=/eco/users/**
 
-      default-filters:
-        - RemoveRequestHeader=Cookie
-        - PreserveHostHeader
+          default-filters:
+            - RemoveRequestHeader=Cookie
+            - PreserveHostHeader
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
