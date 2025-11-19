@@ -1,0 +1,214 @@
+# BASE / DEV (perfil default)
+server:
+  port: 8081
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: ms-auth
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ecofy_auth
+    username: ecofy_auth
+    password: change_me
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # usar Flyway, não gerar schema automático
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+    show-sql: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    client-id: ms-auth
+    producer:
+      acks: all
+      retries: 3
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    properties:
+      security.protocol: PLAINTEXT
+
+  mail:
+    host: smtp.mailtrap.io
+    port: 587
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: smtp
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+  main:
+    allow-bean-definition-overriding: false
+
+# JWT / OIDC – usado pela JwtProperties
+security:
+  jwt:
+    issuer: http://localhost:8081
+    audience: ecofy-api
+    key-id: ecofy-auth-key-1
+    private-key-location: classpath:keys/ecofy-auth-private.pem
+    public-key-location: classpath:keys/ecofy-auth-public.pem
+    access-token-ttl-seconds: 900          # 15 minutos
+    refresh-token-ttl-seconds: 2592000     # 30 dias
+    clock-skew-seconds: 60
+
+# Propriedades de negócio p/ e-mail
+ecofy:
+  mail:
+    from: no-reply@ecofy.local
+    frontend-base-url: http://localhost:3000   # EcoFy Dashboard local
+    templates-base-path: classpath:/mail-templates
+
+# Actuator / Observability
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  health:
+    mail:
+      enabled: true
+    db:
+      enabled: true
+    kafka:
+      enabled: true
+
+# Springdoc OpenAPI / Swagger
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+
+# Logging (dev/base)
+logging:
+  level:
+    root: DEBUG
+    br.com.ecofy.auth: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# PROFILE: test
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/ecofy_auth_test
+    username: ecofy_auth_test
+    password: change_me_test
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  flyway:
+    enabled: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9093}
+
+logging:
+  level:
+    root: WARN
+    br.com.ecofy.auth: INFO
+
+security:
+  jwt:
+    issuer: http://localhost:8081/test
+
+ecofy:
+  mail:
+    frontend-base-url: http://localhost:3000
+
+# PROFILE: prod
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:ecofy_auth}
+    username: ${DB_USER:ecofy_auth}
+    password: ${DB_PASS:change_me}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    properties:
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+      # se usar SASL_SSL, adicionar via env:
+      # sasl.mechanism: PLAIN
+      # sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG:}
+
+  mail:
+    host: ${MAIL_HOST:smtp.sendgrid.net}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: smtp
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+logging:
+  level:
+    root: INFO
+    br.com.ecofy.auth: INFO
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN
+
+security:
+  jwt:
+    issuer: https://auth.ecofy.com
+    audience: ecofy-api
+    key-id: ecofy-auth-key-1
+    private-key-location: ${JWT_PRIVATE_KEY_LOCATION:classpath:keys/ecofy-auth-private.pem}
+    public-key-location: ${JWT_PUBLIC_KEY_LOCATION:classpath:keys/ecofy-auth-public.pem}
+
+ecofy:
+  mail:
+    from: no-reply@ecofy.com
+    frontend-base-url: https://app.ecofy.com
+    templates-base-path: classpath:/mail-templates
