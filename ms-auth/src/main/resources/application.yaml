@@ -3,20 +3,49 @@ server:
   port: 8081
   servlet:
     context-path: /
+  shutdown: graceful
+  compression:
+    enabled: true
+    mime-types: >
+      text/html,text/xml,text/plain,text/css,
+      text/javascript,application/javascript,
+      application/json,application/xml
+    min-response-size: 1024
+
+  forward-headers-strategy: framework  # respeita X-Forwarded-* do gateway
 
 spring:
   application:
     name: ms-auth
 
+  main:
+    allow-bean-definition-overriding: false
+    keep-alive: true
+    web-application-type: servlet
+    # Java 21+/25 + Boot 4: threads virtuais
+    # (se der problema, comentar)
+    threads:
+      virtual:
+        enabled: true
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/ecofy_auth
-    username: ecofy_auth
-    password: change_me
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ecofy_auth}
+    username: ${DB_USER:ecofy_auth}
+    password: ${DB_PASS:change_me}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: MsAuthHikariPool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 300000        # 5 min
+      max-lifetime: 1800000       # 30 min
+      connection-timeout: 30000   # 30s
+      leak-detection-threshold: 0
 
   jpa:
+    open-in-view: false
     hibernate:
-      ddl-auto: validate   # usar Flyway, não gerar schema automático
+      ddl-auto: validate           # schema via Flyway
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -31,7 +60,7 @@ spring:
     locations: classpath:db/migration
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     client-id: ms-auth
     producer:
       acks: all
@@ -44,39 +73,43 @@ spring:
       security.protocol: PLAINTEXT
 
   mail:
-    host: smtp.mailtrap.io
-    port: 587
+    host: ${MAIL_HOST:smtp.mailtrap.io}
+    port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
     protocol: smtp
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 
   jackson:
     serialization:
       write-dates-as-timestamps: false
 
-  main:
-    allow-bean-definition-overriding: false
+  sql:
+    init:
+      mode: never
 
 # JWT / OIDC – usado pela JwtProperties
 security:
   jwt:
-    issuer: http://localhost:8081
-    audience: ecofy-api
-    key-id: ecofy-auth-key-1
-    private-key-location: classpath:keys/ecofy-auth-private.pem
-    public-key-location: classpath:keys/ecofy-auth-public.pem
-    access-token-ttl-seconds: 900          # 15 minutos
-    refresh-token-ttl-seconds: 2592000     # 30 dias
+    issuer: ${JWT_ISSUER:http://localhost:8081}
+    audience: ${JWT_AUDIENCE:ecofy-api}
+    key-id: ${JWT_KEY_ID:ecofy-auth-key-1}
+    private-key-location: ${JWT_PRIVATE_KEY_LOCATION:classpath:keys/ecofy-auth-private.pem}
+    public-key-location: ${JWT_PUBLIC_KEY_LOCATION:classpath:keys/ecofy-auth-public.pem}
+    access-token-ttl-seconds: ${JWT_ACCESS_TTL:900}          # 15 minutos
+    refresh-token-ttl-seconds: ${JWT_REFRESH_TTL:2592000}    # 30 dias
     clock-skew-seconds: 60
 
 # Propriedades de negócio p/ e-mail
 ecofy:
   mail:
-    from: no-reply@ecofy.local
-    frontend-base-url: http://localhost:3000   # EcoFy Dashboard local
+    from: ${MAIL_FROM:no-reply@ecofy.local}
+    frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
     templates-base-path: classpath:/mail-templates
 
 # Actuator / Observability
@@ -108,10 +141,16 @@ springdoc:
     tags-sorter: alpha
     display-request-duration: true
 
+# CORS básico para o dashboard local (ajusta depois se tiver Gateway)
+cors:
+  allowed-origins: "http://localhost:3000"
+  allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+  allowed-headers: "*"
+
 # Logging (dev/base)
 logging:
   level:
-    root: DEBUG
+    root: INFO
     br.com.ecofy.auth: DEBUG
     org.springframework.security: INFO
     org.springframework.web: INFO
@@ -126,13 +165,14 @@ spring:
       on-profile: test
 
   datasource:
-    url: jdbc:postgresql://localhost:5433/ecofy_auth_test
-    username: ecofy_auth_test
-    password: change_me_test
+    url: ${DB_URL_TEST:jdbc:postgresql://localhost:5433/ecofy_auth_test}
+    username: ${DB_USER_TEST:ecofy_auth_test}
+    password: ${DB_PASS_TEST:change_me_test}
   jpa:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
+    open-in-view: false
 
   flyway:
     enabled: false
@@ -164,10 +204,19 @@ spring:
     url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:ecofy_auth}
     username: ${DB_USER:ecofy_auth}
     password: ${DB_PASS:change_me}
+    hikari:
+      pool-name: MsAuthHikariPool
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN:5}
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+
   jpa:
     hibernate:
       ddl-auto: validate
     show-sql: false
+    open-in-view: false
 
   flyway:
     enabled: true
@@ -201,14 +250,14 @@ logging:
 
 security:
   jwt:
-    issuer: https://auth.ecofy.com
-    audience: ecofy-api
-    key-id: ecofy-auth-key-1
+    issuer: ${JWT_ISSUER:https://auth.ecofy.com}
+    audience: ${JWT_AUDIENCE:ecofy-api}
+    key-id: ${JWT_KEY_ID:ecofy-auth-key-1}
     private-key-location: ${JWT_PRIVATE_KEY_LOCATION:classpath:keys/ecofy-auth-private.pem}
     public-key-location: ${JWT_PUBLIC_KEY_LOCATION:classpath:keys/ecofy-auth-public.pem}
 
 ecofy:
   mail:
-    from: no-reply@ecofy.com
-    frontend-base-url: https://app.ecofy.com
+    from: ${MAIL_FROM:no-reply@ecofy.com}
+    frontend-base-url: ${FRONTEND_BASE_URL:https://app.ecofy.com}
     templates-base-path: classpath:/mail-templates

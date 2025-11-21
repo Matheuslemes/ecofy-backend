@@ -6,12 +6,9 @@ import br.com.ecofy.auth.core.domain.valueobject.EmailAddress;
 import br.com.ecofy.auth.core.domain.valueobject.PasswordHash;
 
 import java.time.Instant;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
-// raiz de agregado de usuario de autenticacao
+// raix de agregado do usuario de autenticacao
 public class AuthUser {
 
     private final AuthUserId id;
@@ -42,36 +39,40 @@ public class AuthUser {
 
     private int failedLoginAttempts;
 
-    private AuthUser(AuthUserId id,
-                     EmailAddress email,
-                     PasswordHash passwordHash,
-                     AuthUserStatus status,
-                     boolean emailVerified,
-                     String firstName,
-                     String lastName,
-                     String locale,
-                     Set<Role> roles,
-                     Set<Permission> directPermissions,
-                     Instant createdAt,
-                     Instant updatedAt,
-                     Instant lastLoginAt,
-                     int failedLoginAttempts) {
+    public AuthUser(AuthUserId id,
+                    EmailAddress email,
+                    PasswordHash passwordHash,
+                    AuthUserStatus status,
+                    boolean emailVerified,
+                    String firstName,
+                    String lastName,
+                    String locale,
+                    Set<Role> roles,
+                    Set<Permission> directPermissions,
+                    Instant createdAt,
+                    Instant updatedAt,
+                    Instant lastLoginAt,
+                    int failedLoginAttempts) {
 
-        this.id = Objects.requireNonNull(id);
-        this.email = Objects.requireNonNull(email);
-        this.passwordHash = Objects.requireNonNull(passwordHash);
-        this.status = Objects.requireNonNull(status);
+        this.id = Objects.requireNonNull(id, "id must not be null");
+        this.email = Objects.requireNonNull(email, "email must not be null");
+        this.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash must not be null");
+        this.status = Objects.requireNonNull(status, "status must not be null");
         this.emailVerified = emailVerified;
         this.firstName = firstName;
         this.lastName = lastName;
-        this.locale = locale != null ? locale : "pt-BR";
+        this.locale = (locale != null && !locale.isBlank()) ? locale : "pt-BR";
+
         this.roles = roles != null ? new HashSet<>(roles) : new HashSet<>();
         this.directPermissions = directPermissions != null ? new HashSet<>(directPermissions) : new HashSet<>();
-        this.createdAt = Objects.requireNonNull(createdAt);
-        this.updatedAt = Objects.requireNonNull(updatedAt);
+
+        this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
+        this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
         this.lastLoginAt = lastLoginAt;
-        this.failedLoginAttempts = failedLoginAttempts;
+        this.failedLoginAttempts = Math.max(failedLoginAttempts, 0);
     }
+
+    // Factories
 
     public static AuthUser newPendingUser(EmailAddress email,
                                           PasswordHash passwordHash,
@@ -95,6 +96,10 @@ public class AuthUser {
                 0
         );
     }
+
+    // ========================================================================
+    // Getters (imutáveis / de leitura)
+    // ========================================================================
 
     public AuthUserId id() {
         return id;
@@ -140,6 +145,10 @@ public class AuthUser {
         return lastLoginAt;
     }
 
+    public int failedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
     public Set<Role> roles() {
         return Collections.unmodifiableSet(roles);
     }
@@ -148,16 +157,19 @@ public class AuthUser {
         return Collections.unmodifiableSet(directPermissions);
     }
 
-    // regras de negocio
+    // ========================================================================
+    // Regras de negócio
+    // ========================================================================
+
     public String fullName() {
-        return String.join(" ",
-                Objects.toString(firstName, "").trim(),
-                Objects.toString(lastName, "").trim()).trim();
+        String first = Objects.toString(firstName, "").trim();
+        String last = Objects.toString(lastName, "").trim();
+        return (first + " " + last).trim();
     }
 
     public void confirmEmail() {
         if (status == AuthUserStatus.BLOCKED || status == AuthUserStatus.DELETED) {
-            throw new  IllegalArgumentException("User not eligible to confirm email");
+            throw new IllegalStateException("User is not eligible to confirm email");
         }
         this.emailVerified = true;
         if (status == AuthUserStatus.PENDING_EMAIL_CONFIRMATION) {
@@ -166,12 +178,8 @@ public class AuthUser {
         touch();
     }
 
-    private void touch() {
-        this.updatedAt = Instant.now();
-    }
-
     public void changePassword(PasswordHash newPasswordHash) {
-        this.passwordHash = Objects.requireNonNull(newPasswordHash);
+        this.passwordHash = Objects.requireNonNull(newPasswordHash, "newPasswordHash must not be null");
         this.failedLoginAttempts = 0;
         touch();
     }
@@ -183,6 +191,9 @@ public class AuthUser {
     }
 
     public void registerFailedLogin(int maxAttemptsBeforeLock) {
+        if (maxAttemptsBeforeLock <= 0) {
+            throw new IllegalArgumentException("maxAttemptsBeforeLock must be greater than zero");
+        }
         this.failedLoginAttempts++;
         if (failedLoginAttempts >= maxAttemptsBeforeLock) {
             this.status = AuthUserStatus.LOCKED;
@@ -197,12 +208,12 @@ public class AuthUser {
     }
 
     public void addRole(Role role) {
-        this.roles.add(Objects.requireNonNull(role));
+        this.roles.add(Objects.requireNonNull(role, "role must not be null"));
         touch();
     }
 
     public void addDirectPermission(Permission permission) {
-        this.directPermissions.add(Objects.requireNonNull(permission));
+        this.directPermissions.add(Objects.requireNonNull(permission, "permission must not be null"));
         touch();
     }
 
@@ -216,4 +227,11 @@ public class AuthUser {
         touch();
     }
 
+    // ========================================================================
+    // Internals
+    // ========================================================================
+
+    private void touch() {
+        this.updatedAt = Instant.now();
+    }
 }

@@ -1,4 +1,4 @@
-package br.com.ecofy.auth.core.domain.events;
+package br.com.ecofy.auth.core.domain.event;
 
 import br.com.ecofy.auth.core.domain.AuthUser;
 import br.com.ecofy.auth.core.domain.ClientApplication;

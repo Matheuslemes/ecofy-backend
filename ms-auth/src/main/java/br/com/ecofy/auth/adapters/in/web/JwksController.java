@@ -1,0 +1,86 @@
+package br.com.ecofy.auth.adapters.in.web;
+
+import br.com.ecofy.auth.core.port.in.GetJwksUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
+import java.util.Collection;
+import java.util.Map;
+
+@RestController
+@RequestMapping(path = "/.well-known", produces = MediaType.APPLICATION_JSON_VALUE)
+@Validated
+@Tag(name = "JWKS", description = "JWKS endpoint para validação de tokens JWT pelos consumidores")
+@Slf4j
+public class JwksController {
+
+    private final GetJwksUseCase getJwksUseCase;
+
+    public JwksController(GetJwksUseCase getJwksUseCase) {
+        this.getJwksUseCase = getJwksUseCase;
+    }
+
+    @Operation(
+            summary = "Retorna o documento JWKS",
+            description = """
+                    Endpoint padrão OIDC/JWT para exposição das chaves públicas de assinatura.
+                    Consumidores (API Gateway, outros microserviços) usam esse documento para validar tokens.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "JWKS retornado com sucesso",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)
+                    )
+            ),
+            @ApiResponse(responseCode = "500", description = "Erro interno ao montar JWKS")
+    })
+    @GetMapping("/jwks.json")
+    public ResponseEntity<Map<String, Object>> jwks() {
+        Map<String, Object> jwks = getJwksUseCase.getJwks();
+
+        int keysCount = extractKeysCount(jwks);
+        log.debug("[JwksController] - [jwks] -> Retornando JWKS keysCount={}", keysCount);
+
+        return ResponseEntity
+                .ok()
+                .headers(jwksCacheHeaders())
+                .body(jwks);
+    }
+
+    private int extractKeysCount(Map<String, Object> jwks) {
+        Object keys = jwks.get("keys");
+        if (keys instanceof Collection<?> collection) {
+            return collection.size();
+        }
+        return 0;
+    }
+
+    /**
+     * JWKS pode (e deve) ser cacheado pelos clientes por um tempo curto.
+     * Aqui usamos cache público de 5 minutos, sem no-store.
+     */
+    private HttpHeaders jwksCacheHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setCacheControl(
+                CacheControl.maxAge(Duration.ofMinutes(5))
+                        .cachePublic()
+        );
+        return headers;
+    }
+}
