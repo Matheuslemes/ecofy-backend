@@ -18,7 +18,6 @@ public class JwkKeyEntity {
     @Column(name = "key_id", length = 64)
     private String keyId;
 
-    @Lob
     @Column(name = "public_key_pem", nullable = false)
     private String publicKeyPem;
 

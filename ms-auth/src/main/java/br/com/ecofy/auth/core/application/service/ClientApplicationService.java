@@ -7,6 +7,7 @@ import br.com.ecofy.auth.core.port.in.RegisterClientApplicationUseCase;
 import br.com.ecofy.auth.core.port.out.PasswordHashingPort;
 import br.com.ecofy.auth.core.port.out.SaveClientApplicationPort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -14,6 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 
 @Slf4j
+@Service
 public class ClientApplicationService implements RegisterClientApplicationUseCase {
 
     private final SaveClientApplicationPort saveClientApplicationPort;

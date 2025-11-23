@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -21,13 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @Tag(name = "User Profile", description = "Consulta de perfil do usuário autenticado")
 @Slf4j
+@RequiredArgsConstructor
 public class UserProfileController {
 
     private final GetCurrentUserProfileUseCase getCurrentUserProfileUseCase;
 
-    public UserProfileController(GetCurrentUserProfileUseCase getCurrentUserProfileUseCase) {
-        this.getCurrentUserProfileUseCase = getCurrentUserProfileUseCase;
-    }
 
     @Operation(
             summary = "Retorna o perfil do usuário autenticado",

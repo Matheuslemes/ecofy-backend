@@ -13,10 +13,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -29,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 
 @Component
+@Service
 @Slf4j
 public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
 
@@ -37,6 +41,9 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
     private final RSAPublicKey publicKey;
     private final JWSSigner signer;
     private final JWSHeader jwsHeader;
+
+    // Usado apenas em DEV para guardar o par gerado em memória
+    private RSAPublicKey devPublicKey;
 
     public JwtNimbusTokenProviderAdapter(JwtProperties jwtProperties, ResourceLoader resourceLoader) {
         this.jwtProperties = Objects.requireNonNull(jwtProperties, "jwtProperties must not be null");
@@ -57,9 +64,7 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
         );
     }
 
-    // ======================================================================
     // ACCESS / REFRESH (contrato atual da porta)
-    // ======================================================================
 
     @Override
     public JwtToken generateAccessToken(String subject, Map<String, Object> claims, long ttlSeconds) {
@@ -71,9 +76,7 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
         return generateToken(subject, claims, ttlSeconds, TokenType.REFRESH);
     }
 
-    // ======================================================================
     // VERIFICATION / PASSWORD_RESET (uso dos enums restantes)
-    // ======================================================================
 
     /**
      * Gera um JWT específico para fluxo de verificação de e-mail.
@@ -91,7 +94,6 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
                 subject, ttlSeconds
         );
 
-        // Você pode marcar o propósito como claim adicional, se quiser
         if (claims != null) {
             claims.putIfAbsent("purpose", "EMAIL_VERIFICATION");
         }
@@ -119,7 +121,7 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
         return generateToken(subject, claims, ttlSeconds, TokenType.PASSWORD_RESET);
     }
 
-    // Núcleo de geração
+    // Núcleo de geração de token
     private JwtToken generateToken(String subject,
                                    Map<String, Object> claims,
                                    long ttlSeconds,
@@ -127,7 +129,6 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
 
         Objects.requireNonNull(subject, "subject must not be null");
         Objects.requireNonNull(type, "type must not be null");
-        // claims pode ser null; tratamos abaixo
 
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(ttlSeconds);
@@ -144,7 +145,6 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(exp))
                 .notBeforeTime(Date.from(now.minusSeconds(jwtProperties.getClockSkewSeconds())))
-                // tipagem lógica do token no claim: ACCESS, REFRESH, VERIFICATION, PASSWORD_RESET
                 .claim("typ", type.name());
 
         if (claims != null) {
@@ -224,10 +224,6 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
         }
     }
 
-    /**
-     * Resolve o TokenType a partir do claim "typ".
-     * Usa todos os valores do enum TokenType: ACCESS, REFRESH, VERIFICATION, PASSWORD_RESET.
-     */
     private TokenType resolveTokenType(JWTClaimsSet claimsSet) {
         Object raw = claimsSet.getClaim("typ");
         if (raw == null) {
@@ -245,13 +241,43 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
     }
 
     // Chaves / JWK
+
     private JWSSigner createSigner(RSAPrivateKey privateKey) {
         log.debug("[JwtNimbusTokenProviderAdapter] - [createSigner] -> Criando RSASSASigner");
         return new RSASSASigner(privateKey);
     }
 
+    /**
+     * MODO DEV: gera um par de chaves RSA em memória.
+     *
+     * O código de PROD que lê arquivos PEM permanece comentado logo abaixo.
+     */
     private RSAPrivateKey loadPrivateKey(ResourceLoader resourceLoader, String location) {
         Objects.requireNonNull(location, "private key location must not be null");
+
+        try {
+            log.warn("[JwtNimbusTokenProviderAdapter] - [loadPrivateKey] -> MODO DEV: gerando chave RSA em memória (sem arquivo PEM)");
+
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+            keyPairGenerator.initialize(2048);
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+            RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+            this.devPublicKey = (RSAPublicKey) keyPair.getPublic();
+
+            log.debug("[JwtNimbusTokenProviderAdapter] - [loadPrivateKey] -> Chave privada DEV gerada em memória com sucesso");
+            return privateKey;
+
+        } catch (Exception e) {
+            log.error(
+                    "[JwtNimbusTokenProviderAdapter] - [loadPrivateKey] -> Falha ao gerar chave privada DEV error={}",
+                    e.getMessage(), e
+            );
+            throw new IllegalStateException("Could not generate in-memory DEV private key", e);
+        }
+
+        /*
+        // MODO PROD
         log.debug(
                 "[JwtNimbusTokenProviderAdapter] - [loadPrivateKey] -> Carregando chave privada location={}",
                 location
@@ -280,10 +306,45 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
             );
             throw new IllegalStateException("Could not load private key from " + location, e);
         }
+        */
     }
 
+    /**
+     * MODO DEV: reutiliza a public key gerada junto com a private.
+     *
+     * O código de PROD que lê arquivos PEM permanece comentado logo abaixo.
+     */
     private RSAPublicKey loadPublicKey(ResourceLoader resourceLoader, String location) {
         Objects.requireNonNull(location, "public key location must not be null");
+
+        if (this.devPublicKey != null) {
+            log.debug("[JwtNimbusTokenProviderAdapter] - [loadPublicKey] -> MODO DEV: retornando chave pública em memória");
+            return this.devPublicKey;
+        }
+
+        try {
+            log.warn("[JwtNimbusTokenProviderAdapter] - [loadPublicKey] -> MODO DEV: public key ainda não gerada, criando novo par RSA em memória");
+
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+            keyPairGenerator.initialize(2048);
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+            RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+            this.devPublicKey = publicKey;
+
+            log.debug("[JwtNimbusTokenProviderAdapter] - [loadPublicKey] -> Chave pública DEV gerada em memória com sucesso");
+            return publicKey;
+
+        } catch (Exception e) {
+            log.error(
+                    "[JwtNimbusTokenProviderAdapter] - [loadPublicKey] -> Falha ao gerar chave pública DEV error={}",
+                    e.getMessage(), e
+            );
+            throw new IllegalStateException("Could not generate in-memory DEV public key", e);
+        }
+
+        /*
+        //  MODO PROD
         log.debug(
                 "[JwtNimbusTokenProviderAdapter] - [loadPublicKey] -> Carregando chave pública location={}",
                 location
@@ -312,6 +373,7 @@ public class JwtNimbusTokenProviderAdapter implements JwtTokenProviderPort {
             );
             throw new IllegalStateException("Could not load public key from " + location, e);
         }
+        */
     }
 
     /**

@@ -8,6 +8,7 @@ import br.com.ecofy.auth.core.port.in.RequestPasswordResetUseCase;
 import br.com.ecofy.auth.core.port.in.ResetPasswordUseCase;
 import br.com.ecofy.auth.core.port.out.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -23,6 +24,7 @@ import java.util.UUID;
  *  - Tokens armazenados apenas em store especializado
  */
 @Slf4j
+@Service
 public class PasswordResetService implements RequestPasswordResetUseCase, ResetPasswordUseCase {
 
     private final LoadAuthUserByEmailPort loadAuthUserByEmailPort;

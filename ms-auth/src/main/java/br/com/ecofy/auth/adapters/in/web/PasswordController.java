@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,16 +23,11 @@ import org.springframework.web.bind.annotation.*;
 @Validated
 @Tag(name = "Password", description = "Fluxo de recuperação e redefinição de senha")
 @Slf4j
+@RequiredArgsConstructor
 public class PasswordController {
 
     private final RequestPasswordResetUseCase requestPasswordResetUseCase;
     private final ResetPasswordUseCase resetPasswordUseCase;
-
-    public PasswordController(RequestPasswordResetUseCase requestPasswordResetUseCase,
-                              ResetPasswordUseCase resetPasswordUseCase) {
-        this.requestPasswordResetUseCase = requestPasswordResetUseCase;
-        this.resetPasswordUseCase = resetPasswordUseCase;
-    }
 
     @Operation(
             summary = "Solicita redefinição de senha",

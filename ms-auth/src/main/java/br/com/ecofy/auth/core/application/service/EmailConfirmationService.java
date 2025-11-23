@@ -7,10 +7,12 @@ import br.com.ecofy.auth.core.port.out.PublishAuthEventPort;
 import br.com.ecofy.auth.core.port.out.SaveAuthUserPort;
 import br.com.ecofy.auth.core.port.out.VerificationTokenStorePort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
 @Slf4j
+@Service
 public class EmailConfirmationService implements ConfirmEmailUseCase {
 
     private final VerificationTokenStorePort verificationTokenStorePort;

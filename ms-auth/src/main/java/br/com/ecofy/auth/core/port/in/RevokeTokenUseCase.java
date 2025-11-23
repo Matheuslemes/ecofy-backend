@@ -6,8 +6,6 @@ public interface RevokeTokenUseCase {
 
     record RevokeTokenCommand(
 
-            String clientId,
-
             String token,
 
             boolean refreshToken

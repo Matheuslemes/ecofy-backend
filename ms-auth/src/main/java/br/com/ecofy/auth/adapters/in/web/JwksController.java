@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -24,13 +25,11 @@ import java.util.Map;
 @Validated
 @Tag(name = "JWKS", description = "JWKS endpoint para validação de tokens JWT pelos consumidores")
 @Slf4j
+@RequiredArgsConstructor
 public class JwksController {
 
     private final GetJwksUseCase getJwksUseCase;
 
-    public JwksController(GetJwksUseCase getJwksUseCase) {
-        this.getJwksUseCase = getJwksUseCase;
-    }
 
     @Operation(
             summary = "Retorna o documento JWKS",

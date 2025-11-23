@@ -3,6 +3,7 @@ package br.com.ecofy.auth.core.application.service;
 import br.com.ecofy.auth.core.port.in.RevokeTokenUseCase;
 import br.com.ecofy.auth.core.port.out.RefreshTokenStorePort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
@@ -14,6 +15,7 @@ import java.util.Objects;
  *    (lista de bloqueio, cache distribuído, Redis, etc).
  */
 @Slf4j
+@Service
 public class TokenRevocationService implements RevokeTokenUseCase {
 
     private final RefreshTokenStorePort refreshTokenStorePort;

@@ -9,11 +9,13 @@ import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Objects;
 
 @Component
+@Service
 @Slf4j
 public class MailProviderAdapter implements SendVerificationEmailPort, SendResetPasswordEmailPort {
 

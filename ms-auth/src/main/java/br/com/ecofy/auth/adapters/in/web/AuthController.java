@@ -1,10 +1,10 @@
 package br.com.ecofy.auth.adapters.in.web;
 
-import br.com.ecofy.auth.adapters.in.web.dto.LoginRequest;
-import br.com.ecofy.auth.adapters.in.web.dto.RefreshTokenRequest;
-import br.com.ecofy.auth.adapters.in.web.dto.TokenResponse;
+import br.com.ecofy.auth.adapters.in.web.dto.*;
 import br.com.ecofy.auth.core.port.in.AuthenticateUserUseCase;
 import br.com.ecofy.auth.core.port.in.RefreshTokenUseCase;
+import br.com.ecofy.auth.core.port.in.RevokeTokenUseCase;
+import br.com.ecofy.auth.core.port.in.ValidateTokenUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -28,16 +29,13 @@ import java.time.Duration;
 @Validated
 @Tag(name = "Authentication", description = "Endpoints de autenticação e renovação de tokens JWT/OIDC")
 @Slf4j
+@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthenticateUserUseCase authenticateUserUseCase;
     private final RefreshTokenUseCase refreshTokenUseCase;
-
-    public AuthController(AuthenticateUserUseCase authenticateUserUseCase,
-                          RefreshTokenUseCase refreshTokenUseCase) {
-        this.authenticateUserUseCase = authenticateUserUseCase;
-        this.refreshTokenUseCase = refreshTokenUseCase;
-    }
+    private final RevokeTokenUseCase revokeTokenUseCase;
+    private final ValidateTokenUseCase validateTokenUseCase;
 
     @Operation(
             summary = "Emite access token e refresh token",
@@ -135,6 +133,80 @@ public class AuthController {
                 .headers(oauthNoStoreHeaders())
                 .body(response);
     }
+
+    @Operation(
+            summary = "Revoga um token (logout)",
+            description = """
+                    Revoga um token emitido pelo ms-auth.
+                    Atualmente trata principalmente refresh tokens (logout).
+                    
+                    Em geral, o cliente deve enviar o refresh_token para encerrar a sessão.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Token revogado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida (token ausente ou malformado)"),
+            @ApiResponse(responseCode = "500", description = "Erro interno no servidor")
+    })
+    @PostMapping(
+            path = "/revoke",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<Void> revoke(@Valid @RequestBody RevokeTokenRequest request) {
+
+        boolean isRefresh = request.refreshToken() == null || request.refreshToken();
+
+        log.debug(
+                "[AuthController] - [revoke] -> Revogando token (refreshToken={})",
+                isRefresh
+        );
+
+        revokeTokenUseCase.revoke(
+                new RevokeTokenUseCase.RevokeTokenCommand(
+                        request.token(),
+                        isRefresh
+                )
+        );
+
+        log.debug("[AuthController] - [revoke] -> Token revogado com sucesso");
+
+        return ResponseEntity
+                .noContent()
+                .headers(oauthNoStoreHeaders())
+                .build();
+    }
+
+    @Operation(
+            summary = "Valida um access token JWT",
+            description = """
+                Valida a assinatura e a expiração de um token JWT.
+                Retorna os claims principais caso o token seja válido.
+                """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Token válido",
+                    content = @Content(schema = @Schema(implementation = ValidateTokenResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Token inválido ou malformado"),
+            @ApiResponse(responseCode = "401", description = "Token expirado ou inválido"),
+            @ApiResponse(responseCode = "500", description = "Erro interno no servidor")
+    })
+    @PostMapping(
+            path = "/validate",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<ValidateTokenResponse> validate(@Valid @RequestBody ValidateTokenRequest request) {
+
+        log.debug("[AuthController] - [validate] -> Validando token");
+
+        var claims = validateTokenUseCase.validate(request.token());
+
+        var response = new ValidateTokenResponse(true, claims);
+
+        return ResponseEntity
+                .ok()
+                .headers(oauthNoStoreHeaders())
+                .body(response);
+    }
+
 
     /**
      * Resolve IP real do cliente considerando cabeçalhos de proxy/gateway.

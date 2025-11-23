@@ -4,6 +4,7 @@ import br.com.ecofy.auth.core.domain.AuthUser;
 import br.com.ecofy.auth.core.port.in.GetCurrentUserProfileUseCase;
 import br.com.ecofy.auth.core.port.out.CurrentUserProviderPort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
@@ -13,6 +14,7 @@ import java.util.Objects;
  * mantendo o domínio independente de Spring Security.
  */
 @Slf4j
+@Service
 public class CurrentUserProfileService implements GetCurrentUserProfileUseCase {
 
     private final CurrentUserProviderPort currentUserProviderPort;

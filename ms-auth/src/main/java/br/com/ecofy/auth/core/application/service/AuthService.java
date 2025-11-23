@@ -13,12 +13,14 @@ import br.com.ecofy.auth.core.port.in.AuthenticateUserUseCase;
 import br.com.ecofy.auth.core.port.in.RefreshTokenUseCase;
 import br.com.ecofy.auth.core.port.out.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
 @Slf4j
+@Service
 public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase {
 
     private final LoadAuthUserByEmailPort loadAuthUserByEmailPort;

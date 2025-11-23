@@ -7,6 +7,7 @@ import br.com.ecofy.auth.core.domain.valueobject.PasswordHash;
 import br.com.ecofy.auth.core.port.in.RegisterUserUseCase;
 import br.com.ecofy.auth.core.port.out.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -20,6 +21,7 @@ import java.util.UUID;
  *  - publicação de evento de domínio
  */
 @Slf4j
+@Service
 public class RegisterUserService implements RegisterUserUseCase {
 
     private final SaveAuthUserPort saveAuthUserPort;

@@ -3,6 +3,7 @@ package br.com.ecofy.auth.core.application.service;
 import br.com.ecofy.auth.core.port.in.ValidateTokenUseCase;
 import br.com.ecofy.auth.core.port.out.JwtTokenProviderPort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.Map;
 import java.util.Objects;
@@ -19,6 +20,7 @@ import java.util.Objects;
  *  - validações customizadas de claims
  */
 @Slf4j
+@Service
 public class TokenValidationService implements ValidateTokenUseCase {
 
     private final JwtTokenProviderPort jwtTokenProviderPort;

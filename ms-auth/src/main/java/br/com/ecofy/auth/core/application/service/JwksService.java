@@ -3,7 +3,9 @@ package br.com.ecofy.auth.core.application.service;
 import br.com.ecofy.auth.core.domain.JwkKey;
 import br.com.ecofy.auth.core.port.in.GetJwksUseCase;
 import br.com.ecofy.auth.core.port.out.JwksRepositoryPort;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.*;
 
@@ -15,6 +17,7 @@ import java.util.*;
  * assim que o adapter de persistência fornecer esses valores.
  */
 @Slf4j
+@Service
 public class JwksService implements GetJwksUseCase {
 
     private final JwksRepositoryPort jwksRepositoryPort;

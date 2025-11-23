@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,16 +27,12 @@ import java.net.URI;
 @Validated
 @Tag(name = "Registration", description = "Registro de novos usuários e confirmação de e-mail")
 @Slf4j
+@RequiredArgsConstructor
 public class RegistrationController {
 
     private final RegisterUserUseCase registerUserUseCase;
     private final ConfirmEmailUseCase confirmEmailUseCase;
 
-    public RegistrationController(RegisterUserUseCase registerUserUseCase,
-                                  ConfirmEmailUseCase confirmEmailUseCase) {
-        this.registerUserUseCase = registerUserUseCase;
-        this.confirmEmailUseCase = confirmEmailUseCase;
-    }
 
     @Operation(
             summary = "Registra um novo usuário",
