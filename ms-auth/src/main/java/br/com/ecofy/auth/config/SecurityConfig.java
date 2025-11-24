@@ -1,11 +1,12 @@
 package br.com.ecofy.auth.config;
 
+import br.com.ecofy.auth.adapters.out.jwt.JwtNimbusTokenProviderAdapter;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.jwk.RSAKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -15,13 +16,8 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.security.GeneralSecurityException;
-import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
+import java.util.ArrayList;
 
 @Configuration
 @EnableMethodSecurity
@@ -30,7 +26,7 @@ import java.util.Base64;
 public class SecurityConfig {
 
     private final JwtProperties jwtProperties;
-    private final ResourceLoader resourceLoader;
+    private final JwtNimbusTokenProviderAdapter jwtNimbusTokenProviderAdapter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -73,44 +69,27 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * JwtDecoder baseado na MESMA chave pública usada pelo JwtNimbusTokenProviderAdapter.
+     * Em modo dev, a chave é gerada em memória no adapter.
+     */
     @Bean
-    public JwtDecoder jwtDecoder() throws GeneralSecurityException, IOException {
-        RSAPublicKey publicKey = loadPublicKey(jwtProperties.getPublicKeyLocation());
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(publicKey).build();
+    public JwtDecoder jwtDecoder() {
+        try {
+            RSAKey rsaJwk = jwtNimbusTokenProviderAdapter.toRsaJwk();
+            RSAPublicKey publicKey = rsaJwk.toRSAPublicKey();
 
-        decoder.setJwtValidator(new JwtValidatorFactory(jwtProperties).create());
+            NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(publicKey).build();
+            decoder.setJwtValidator(new JwtValidatorFactory(jwtProperties).create());
+            return decoder;
 
-        return decoder;
+        } catch (JOSEException e) {
 
-    }
-
-    private RSAPublicKey loadPublicKey(String location) throws IOException, GeneralSecurityException {
-        if (location == null || location.isBlank()) {
-            throw new IllegalStateException("security.jwt.public-key-location must be configured");
-        }
-
-        Resource resource = resourceLoader.getResource(location);
-        if (!resource.exists()) {
-            throw new IllegalStateException("Public key resource not found: " + location);
-        }
-
-        try (InputStream is = resource.getInputStream()) {
-            String pem = new String(is.readAllBytes());
-            String sanitized = pem
-                    .replace("BEGIN PUBLIC KEY", "")
-                    .replace("END PUBLIC KEY", "")
-                    .replaceAll("\\s", "");
-
-            byte[] decoded = Base64.getDecoder().decode(sanitized);
-            X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
-            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-            return (RSAPublicKey) keyFactory.generatePublic(keySpec);
+            throw new IllegalStateException("Could not create JwtDecoder from in-memory JWK", e);
         }
     }
 
     // fabrica simples para montar um validator customizado de JWT
-    // (Issuer, clock skww etc.)
-    // validacoes de audience, escopos, etc.
     static class JwtValidatorFactory {
 
         private final JwtProperties jwtProperties;
@@ -121,16 +100,15 @@ public class SecurityConfig {
 
         public OAuth2TokenValidator<Jwt> create() {
 
-            var validators = new java.util.ArrayList<OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt>>();
+            var validators = new ArrayList<OAuth2TokenValidator<Jwt>>();
 
             if (jwtProperties.getIssuer() != null) {
                 validators.add(new JwtIssuerValidator(jwtProperties.getIssuer()));
             }
 
-            // validador default (timestamp, exp, nbf)
+            // validador default (timestamps, exp, nbf etc.)
             validators.add(JwtValidators.createDefault());
 
-            // combina todos em um
             return new DelegatingOAuth2TokenValidator<>(validators);
 
         }

@@ -92,10 +92,7 @@ public class AuthUserJpaAdapter implements SaveAuthUserPort, LoadAuthUserByEmail
                 });
     }
 
-    // =========================================================
     // Mapeamento domínio -> entidade
-    // =========================================================
-
     private void mapDomainToEntity(AuthUser user, AuthUserEntity entity, Instant now) {
         entity.setEmail(user.email().value());
         entity.setPasswordHash(user.passwordHash().value());

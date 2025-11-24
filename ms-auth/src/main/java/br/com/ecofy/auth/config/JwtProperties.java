@@ -22,7 +22,7 @@ public class JwtProperties {
     private String publicKeyLocation;
 
     // tempo de vida do refresh token em segundos
-    private final Long accessTokenTllSeconds = 900L; // 15min
+    private final Long accessTokenTtlSeconds = 900L; // 15min
 
     // tempo de vida do refresg token em segundos
     private final Long refreshTokenTtlSeconds = 60L * 60L * 24L * 30L; // 30 dias
@@ -71,8 +71,8 @@ public class JwtProperties {
         this.privateKeyLocation = privateKeyLocation;
     }
 
-    public Long getAccessTokenTllSeconds() {
-        return accessTokenTllSeconds;
+    public Long getAccessTokenTtlSeconds() {
+        return accessTokenTtlSeconds;
     }
 
     public Long getRefreshTokenTtlSeconds() {

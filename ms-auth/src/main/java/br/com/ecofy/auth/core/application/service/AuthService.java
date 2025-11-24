@@ -1,5 +1,6 @@
 package br.com.ecofy.auth.core.application.service;
 
+import br.com.ecofy.auth.config.JwtProperties;
 import br.com.ecofy.auth.core.domain.AuthUser;
 import br.com.ecofy.auth.core.domain.ClientApplication;
 import br.com.ecofy.auth.core.domain.JwtToken;
@@ -19,6 +20,27 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Serviço responsável pelos fluxos de autenticação do MS Auth.
+
+ * Funcionalidades principais:
+ *  - Autenticação via PASSWORD grant (username + password)
+ *  - Emissão de access token e refresh token seguindo TTLs definidos em {@link JwtProperties}
+ *  - Validação de client applications conforme regras de ClientType × GrantType
+ *  - Persistência e gerenciamento de refresh tokens via RefreshTokenStorePort
+ *  - Publicação de eventos de domínio (ex.: {@link UserAuthenticatedEvent})
+ *  - Fluxo completo de refresh token com verificação de claims, tipo e client vinculado
+
+ * Extensível para:
+ *  - Suporte a DEVICE_CODE, PKCE avançado ou flows customizados
+ *  - Revogação centralizada via blacklist de JWT (Redis / Cache distribuído)
+ *  - Inclusão de roles / permissions nos access tokens
+
+ * Observações:
+ *  - Nenhum token sensível é logado; sempre mascarado
+ *  - Fail-fast em todas as dependências e comandos nulos
+ *  - Todas as regras do domínio são centralizadas aqui, mantendo o core limpo
+ */
 @Slf4j
 @Service
 public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase {
@@ -30,6 +52,10 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
     private final RefreshTokenStorePort refreshTokenStorePort;
     private final PublishAuthEventPort publishAuthEventPort;
 
+    /**
+     * TTLs em segundos para access e refresh tokens.
+     * São carregados de {@link JwtProperties}.
+     */
     private final long accessTokenTtlSeconds;
     private final long refreshTokenTtlSeconds;
 
@@ -39,8 +65,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                        JwtTokenProviderPort jwtTokenProviderPort,
                        RefreshTokenStorePort refreshTokenStorePort,
                        PublishAuthEventPort publishAuthEventPort,
-                       long accessTokenTtlSeconds,
-                       long refreshTokenTtlSeconds) {
+                       JwtProperties jwtProperties) {
 
         this.loadAuthUserByEmailPort =
                 Objects.requireNonNull(loadAuthUserByEmailPort, "loadAuthUserByEmailPort must not be null");
@@ -55,8 +80,15 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
         this.publishAuthEventPort =
                 Objects.requireNonNull(publishAuthEventPort, "publishAuthEventPort must not be null");
 
-        this.accessTokenTtlSeconds = accessTokenTtlSeconds;
-        this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
+        JwtProperties props = Objects.requireNonNull(jwtProperties, "jwtProperties must not be null");
+
+        this.accessTokenTtlSeconds = props.getAccessTokenTtlSeconds();
+        this.refreshTokenTtlSeconds = props.getRefreshTokenTtlSeconds();
+
+        log.info(
+                "[AuthService] - [constructor] -> TTLs configurados accessTokenTtlSeconds={}s refreshTokenTtlSeconds={}s",
+                accessTokenTtlSeconds, refreshTokenTtlSeconds
+        );
     }
 
     // PASSWORD GRANT (username/password)
@@ -166,7 +198,6 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
 
         Map<String, Object> claims = jwtTokenProviderPort.parseClaims(stored.tokenValue());
 
-        // Usa o claim "typ" com enum TokenType (novos enums sendo usados aqui)
         Object rawType = claims.get("typ");
         if (rawType == null || !TokenType.REFRESH.name().equals(rawType.toString())) {
             log.warn(
@@ -187,7 +218,6 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
             throw new IllegalArgumentException("Malformed refresh token claims");
         }
 
-        // valida client_id do comando x token salvo x claims
         if (!stored.clientId().equals(command.clientId()) || !clientIdFromClaims.equals(command.clientId())) {
             log.warn(
                     "[AuthService] - [refresh] -> Refresh token não pertence ao client armazenadoClientId={} claimsClientId={} commandClientId={} tokenMask={}",
@@ -196,7 +226,6 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
             throw new IllegalArgumentException("Refresh token does not belong to client");
         }
 
-        // garante que o client ainda é válido e suporta REFRESH_TOKEN
         ClientApplication client = loadClientApplicationByClientIdPort
                 .loadByClientId(command.clientId())
                 .orElseThrow(() -> {
@@ -209,11 +238,9 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
 
         validateClientForRefreshGrant(client);
 
-        // Gera novo access token reaproveitando (ou refinando) os claims
         JwtToken newAccess = jwtTokenProviderPort
                 .generateAccessToken(userId, claims, accessTokenTtlSeconds);
 
-        // Novo refresh token com claims mínimos e tipagem REFRESH tratada no provider
         Map<String, Object> refreshClaims = Map.of("client_id", clientIdFromClaims);
         JwtToken newRefresh = jwtTokenProviderPort
                 .generateRefreshToken(userId, refreshClaims, refreshTokenTtlSeconds);
@@ -241,12 +268,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
     }
 
     // Helpers de domínio / regras de grant
-    /**
-     * Regras para PASSWORD grant:
-     *  - client deve estar ativo
-     *  - deve suportar GrantType.PASSWORD
-     *  - tipo do client deve ser compatível (CONFIDENTIAL ou SPA, por ex.)
-     */
+
     private void validateClientForPasswordGrant(ClientApplication client) {
         if (!client.isActive()) {
             log.warn(
@@ -274,11 +296,6 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
         }
     }
 
-    /**
-     * Regras para REFRESH_TOKEN grant:
-     *  - client ativo
-     *  - suporta REFRESH_TOKEN
-     */
     private void validateClientForRefreshGrant(ClientApplication client) {
         if (!client.isActive()) {
             log.warn(

@@ -42,6 +42,6 @@ public class JwksJpaAdapter implements JwksRepositoryPort {
                 keys.size()
         );
 
-        return List.copyOf(keys); // lista imutável, alinhada com boas práticas
+        return List.copyOf(keys);
     }
 }

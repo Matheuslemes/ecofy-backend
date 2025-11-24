@@ -39,4 +39,5 @@ public class CurrentUserProfileService implements GetCurrentUserProfileUseCase {
 
         return user;
     }
+
 }

@@ -14,6 +14,22 @@ import java.util.Base64;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * Serviço responsável pelo registro e gerenciamento de Client Applications no MS Auth.
+
+ * Funcionalidades principais:
+ *   - Geração de client_id e client_secret (conforme regras por tipo de client)
+ *   - Hash seguro do secret usando PasswordHashingPort
+ *   - Aplicação das regras de negócio para combinação válida de ClientType × GrantType
+ *   - Validação obrigatória de redirectUris quando necessário (ex.: AUTHORIZATION_CODE)
+ *   - Persistência do agregado ClientApplication via SaveClientApplicationPort
+
+ * Observações:
+ *   - O secret bruto NUNCA é armazenado no domínio; apenas seu hash persistido.
+ *   - O rawSecret deve ser retornado externamente no fluxo de apresentação (DTO/handler).
+ *   - Tokens e segredos sensíveis jamais são logados; apenas eventos e estados.
+ *   - Pode ser estendido para políticas avançadas (limites, confiança, IPs, scopes dinâmicos).
+ */
 @Slf4j
 @Service
 public class ClientApplicationService implements RegisterClientApplicationUseCase {
@@ -104,9 +120,7 @@ public class ClientApplicationService implements RegisterClientApplicationUseCas
                 || clientType == ClientType.MACHINE_TO_MACHINE;
     }
 
-    // ========================================================================
     // Grants / validações
-    // ========================================================================
 
     /**
      * Se o comando não mandar grants, escolhemos defaults por tipo de client.
@@ -133,6 +147,7 @@ public class ClientApplicationService implements RegisterClientApplicationUseCas
                     GrantType.CLIENT_CREDENTIALS
             );
         };
+
     }
 
     private void validateGrants(ClientType clientType, Set<GrantType> grants) {
@@ -171,6 +186,7 @@ public class ClientApplicationService implements RegisterClientApplicationUseCas
     }
 
     private void validateRedirectUrisIfNeeded(Set<GrantType> grants, Set<String> redirectUris) {
+
         if (grants.contains(GrantType.AUTHORIZATION_CODE)) {
             if (redirectUris == null || redirectUris.isEmpty()) {
                 log.warn(
@@ -181,11 +197,10 @@ public class ClientApplicationService implements RegisterClientApplicationUseCas
                 );
             }
         }
+
     }
 
-    // ========================================================================
     // Geração de credenciais
-    // ========================================================================
 
     private String generateClientId(String name) {
         byte[] bytes = new byte[12];
@@ -200,6 +215,7 @@ public class ClientApplicationService implements RegisterClientApplicationUseCas
         );
 
         return clientId;
+
     }
 
     private String generateSecret() {

@@ -107,9 +107,9 @@ final class PersistenceMapper {
                 e.getClientSecretHash(),
                 e.getName(),
                 e.getClientType(),
-                e.getGrantTypes(), // Set<GrantType>
-                e.getRedirectUris(), // Set<String>
-                e.getScopes(), // Set<String>
+                e.getGrantTypes(),
+                e.getRedirectUris(),
+                e.getScopes(),
                 e.isFirstParty(),
                 e.isActive(),
                 e.getCreatedAt(),
@@ -163,7 +163,7 @@ final class PersistenceMapper {
                 .issuedAt(t.issuedAt())
                 .expiresAt(t.expiresAt())
                 .revoked(t.isRevoked())
-                .type(TokenType.REFRESH) // domínio já é de refresh, mas deixamos explícito
+                .type(TokenType.REFRESH)
                 .build();
     }
 
