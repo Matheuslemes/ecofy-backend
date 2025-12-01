@@ -43,25 +43,42 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/actuator/health",
                                 "/actuator/info",
+
+                                // OpenAPI / Swagger
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
+
+                                // AuthController
                                 "/api/auth/token",
                                 "/api/auth/refresh",
+                                "/api/auth/validate",
+                                "/api/auth/revoke",
+
+                                // RegistrationController
                                 "/api/register/**",
+
+                                // PasswordController
                                 "/api/password/**",
-                                "/.well-known/jwks.json"
+
+                                // JwksController
+                                "/.well-known/**"
                         ).permitAll()
-                        // permissão temporaria
-//                        .requestMatchers("/api/admin/users").permitAll()
-                        .requestMatchers("/api/admin/**").hasAuthority("AUTH_ADMIN")
+
+                        //  Endpoints administrativos
+                        // comentado para permissão temporaria para dev
+//                        .requestMatchers("/api/admin/**").hasAuthority("AUTH_ADMIN")
+                        // Ex.: ClientApplicationController -> /api/admin/clients
+
+                        //  Demais endpoints precisam apenas estar autenticados
+                        // Ex.: UserProfileController -> /api/user/me
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.decoder(jwtDecoder))
                 );
 
-        // headers extras, HSTS, etc.
+        // headers extras, HSTS, CSP etc.
         http.headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp
                         .policyDirectives("default-src 'self'"))
@@ -70,6 +87,7 @@ public class SecurityConfig {
 
         return http.build();
     }
+
 
     /**
      * JwtDecoder baseado na MESMA chave pública usada pelo JwtNimbusTokenProviderAdapter.

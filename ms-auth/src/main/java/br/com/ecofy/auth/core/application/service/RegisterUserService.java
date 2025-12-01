@@ -1,5 +1,6 @@
 package br.com.ecofy.auth.core.application.service;
 
+import br.com.ecofy.auth.core.application.service.exception.EmailAlreadyRegisteredException;
 import br.com.ecofy.auth.core.domain.AuthUser;
 import br.com.ecofy.auth.core.domain.Role;
 import br.com.ecofy.auth.core.domain.event.UserRegisteredEvent;
@@ -46,12 +47,10 @@ public class RegisterUserService implements RegisterUserUseCase {
         EmailAddress email = new EmailAddress(command.email());
         String locale = command.locale() != null ? command.locale() : "pt-BR";
 
-        // garante pelo menos AUTH_USER se nada vier
         List<String> roleNames = (command.roles() == null || command.roles().isEmpty())
                 ? List.of("AUTH_USER")
                 : command.roles();
 
-        // mapeia nomes de roles para objetos Role de domínio (sem permissões diretas por enquanto)
         Set<Role> roles = roleNames.stream()
                 .filter(Objects::nonNull)
                 .map(String::trim)
@@ -70,7 +69,7 @@ public class RegisterUserService implements RegisterUserUseCase {
                     "[RegisterUserService] - [register] -> Email já registrado email={} userId={}",
                     email.value(), existing.id().value()
             );
-            throw new IllegalArgumentException("Email already registered");
+            throw new EmailAlreadyRegisteredException(email.value(), existing.id().value());
         });
 
         // 2 — Hash seguro da senha
