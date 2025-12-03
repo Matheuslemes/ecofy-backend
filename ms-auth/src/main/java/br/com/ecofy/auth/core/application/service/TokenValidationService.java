@@ -1,5 +1,7 @@
 package br.com.ecofy.auth.core.application.service;
 
+import br.com.ecofy.auth.core.application.exception.AuthErrorCode;
+import br.com.ecofy.auth.core.application.exception.AuthException;
 import br.com.ecofy.auth.core.port.in.ValidateTokenUseCase;
 import br.com.ecofy.auth.core.port.out.JwtTokenProviderPort;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +50,10 @@ public class TokenValidationService implements ValidateTokenUseCase {
                     "[TokenValidationService] - [validate] -> Token inválido tokenMask={}",
                     masked
             );
-            throw new IllegalArgumentException("Invalid token");
+            throw new AuthException(
+                    AuthErrorCode.INVALID_TOKEN_SIGNATURE,
+                    "Invalid token"
+            );
         }
 
         Map<String, Object> claims = jwtTokenProviderPort.parseClaims(token);

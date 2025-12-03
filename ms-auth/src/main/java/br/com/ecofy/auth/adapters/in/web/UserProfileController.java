@@ -1,6 +1,6 @@
 package br.com.ecofy.auth.adapters.in.web;
 
-import br.com.ecofy.auth.adapters.in.web.dto.UserResponse;
+import br.com.ecofy.auth.adapters.in.web.dto.response.UserResponse;
 import br.com.ecofy.auth.core.port.in.GetCurrentUserProfileUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;

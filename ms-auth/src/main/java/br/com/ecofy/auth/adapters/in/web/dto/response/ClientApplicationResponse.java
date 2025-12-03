@@ -1,27 +1,33 @@
-package br.com.ecofy.auth.adapters.in.web.dto;
+package br.com.ecofy.auth.adapters.in.web.dto.response;
 
 import br.com.ecofy.auth.core.domain.enums.ClientType;
 import br.com.ecofy.auth.core.domain.enums.GrantType;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
+import java.time.Instant;
 import java.util.Set;
 
-public record ClientApplicationRequest(
+public record ClientApplicationResponse(
 
-        @NotBlank
+        String id,
+
+        String clientId,
+
         String name,
 
-        @NotNull
         ClientType clientType,
 
         Set<GrantType> grantTypes,
-
 
         Set<String> redirectUris,
 
         Set<String> scopes,
 
-        Boolean firstParty
+        boolean firstParty,
+
+        boolean active,
+
+        Instant createdAt,
+
+        Instant updatedAt
 
 ) { }

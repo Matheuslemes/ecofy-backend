@@ -1,6 +1,11 @@
 package br.com.ecofy.auth.adapters.in.web;
 
-import br.com.ecofy.auth.adapters.in.web.dto.*;
+import br.com.ecofy.auth.adapters.in.web.dto.request.LoginRequest;
+import br.com.ecofy.auth.adapters.in.web.dto.request.RefreshTokenRequest;
+import br.com.ecofy.auth.adapters.in.web.dto.request.RevokeTokenRequest;
+import br.com.ecofy.auth.adapters.in.web.dto.request.ValidateTokenRequest;
+import br.com.ecofy.auth.adapters.in.web.dto.response.TokenResponse;
+import br.com.ecofy.auth.adapters.in.web.dto.response.ValidateTokenResponse;
 import br.com.ecofy.auth.core.port.in.AuthenticateUserUseCase;
 import br.com.ecofy.auth.core.port.in.RefreshTokenUseCase;
 import br.com.ecofy.auth.core.port.in.RevokeTokenUseCase;

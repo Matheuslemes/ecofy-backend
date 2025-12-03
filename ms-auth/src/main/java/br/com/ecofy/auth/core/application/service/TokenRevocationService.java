@@ -1,5 +1,7 @@
 package br.com.ecofy.auth.core.application.service;
 
+import br.com.ecofy.auth.core.application.exception.AuthErrorCode;
+import br.com.ecofy.auth.core.application.exception.AuthException;
 import br.com.ecofy.auth.core.port.in.RevokeTokenUseCase;
 import br.com.ecofy.auth.core.port.out.RefreshTokenStorePort;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +38,17 @@ public class TokenRevocationService implements RevokeTokenUseCase {
                 masked, command.refreshToken()
         );
 
+        if (!command.refreshToken()) {
+            log.warn(
+                    "[TokenRevocationService] - [revoke] -> Tipo de token não suportado para revogação tokenMask={}",
+                    masked
+            );
+            throw new AuthException(
+                    AuthErrorCode.TOKEN_TYPE_NOT_SUPPORTED_FOR_REVOCATION,
+                    "Only refresh tokens can be revoked"
+            );
+        }
+
         if (command.refreshToken()) {
             refreshTokenStorePort.revoke(command.token());
             log.debug(
@@ -43,11 +56,6 @@ public class TokenRevocationService implements RevokeTokenUseCase {
                     masked
             );
         }
-
-        // FUTURO: se desejar implementar revogação de access token:
-        // - adicionar AccessTokenBlacklistPort ou Cache
-        // - armazenar jti ou tokenValue por TTL = expiração natural
-        // - validar blacklist no JwtDecoder
 
         log.debug(
                 "[TokenRevocationService] - [revoke] -> Processo concluído tokenMask={}",

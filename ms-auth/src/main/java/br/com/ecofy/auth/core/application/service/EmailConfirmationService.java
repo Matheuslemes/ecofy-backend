@@ -1,5 +1,7 @@
 package br.com.ecofy.auth.core.application.service;
 
+import br.com.ecofy.auth.core.application.exception.AuthErrorCode;
+import br.com.ecofy.auth.core.application.exception.AuthException;
 import br.com.ecofy.auth.core.domain.AuthUser;
 import br.com.ecofy.auth.core.domain.event.UserEmailConfirmedEvent;
 import br.com.ecofy.auth.core.port.in.ConfirmEmailUseCase;
@@ -63,7 +65,10 @@ public class EmailConfirmationService implements ConfirmEmailUseCase {
                             "[EmailConfirmationService] - [confirm] -> Token inválido ou expirado token={}",
                             maskedToken
                     );
-                    return new IllegalArgumentException("Invalid or expired verification token");
+                    return new AuthException(
+                            AuthErrorCode.EMAIL_CONFIRMATION_TOKEN_INVALID,
+                            "Invalid or expired verification token"
+                    );
                 });
 
         log.debug(

@@ -1,5 +1,7 @@
 package br.com.ecofy.auth.core.application.service;
 
+import br.com.ecofy.auth.core.application.exception.AuthErrorCode;
+import br.com.ecofy.auth.core.application.exception.AuthException;
 import br.com.ecofy.auth.core.domain.AuthUser;
 import br.com.ecofy.auth.core.domain.event.PasswordResetRequestedEvent;
 import br.com.ecofy.auth.core.domain.valueobject.EmailAddress;
@@ -74,7 +76,10 @@ public class PasswordResetService implements RequestPasswordResetUseCase, ResetP
                             "[PasswordResetService] - [requestReset] -> Usuário não encontrado email={}",
                             email.value()
                     );
-                    return new IllegalArgumentException("User not found");
+                    return new AuthException(
+                            AuthErrorCode.USER_NOT_FOUND,
+                            "User not found"
+                    );
                 });
 
         String resetToken = UUID.randomUUID().toString();
@@ -120,7 +125,10 @@ public class PasswordResetService implements RequestPasswordResetUseCase, ResetP
                             "[PasswordResetService] - [resetPassword] -> Token inválido ou expirado token={}",
                             maskedToken
                     );
-                    return new IllegalArgumentException("Invalid or expired reset token");
+                    return new AuthException(
+                            AuthErrorCode.PASSWORD_RESET_TOKEN_INVALID,
+                            "Invalid or expired reset token"
+                    );
                 });
 
         log.debug(

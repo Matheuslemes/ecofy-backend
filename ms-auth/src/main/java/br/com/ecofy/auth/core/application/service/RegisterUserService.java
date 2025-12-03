@@ -1,6 +1,7 @@
 package br.com.ecofy.auth.core.application.service;
 
-import br.com.ecofy.auth.core.application.service.exception.EmailAlreadyRegisteredException;
+import br.com.ecofy.auth.core.application.exception.AuthErrorCode;
+import br.com.ecofy.auth.core.application.exception.AuthException;
 import br.com.ecofy.auth.core.domain.AuthUser;
 import br.com.ecofy.auth.core.domain.Role;
 import br.com.ecofy.auth.core.domain.event.UserRegisteredEvent;
@@ -63,19 +64,19 @@ public class RegisterUserService implements RegisterUserUseCase {
                 email.value(), command.firstName(), command.lastName(), locale, roleNames
         );
 
-        // 1 — Verifica se já existe usuário com o email informado
         loadAuthUserByEmailPort.loadByEmail(email).ifPresent(existing -> {
             log.warn(
                     "[RegisterUserService] - [register] -> Email já registrado email={} userId={}",
                     email.value(), existing.id().value()
             );
-            throw new EmailAlreadyRegisteredException(email.value(), existing.id().value());
+            throw new AuthException(
+                    AuthErrorCode.EMAIL_ALREADY_REGISTERED,
+                    "Email already registered: " + email.value()
+            );
         });
 
-        // 2 — Hash seguro da senha
         PasswordHash passwordHash = passwordHashingPort.hash(command.rawPassword());
 
-        // 3 — Criação do agregado AuthUser (pending ou confirmado)
         AuthUser newUser = AuthUser.newPendingUser(
                 email,
                 passwordHash,
@@ -94,7 +95,6 @@ public class RegisterUserService implements RegisterUserUseCase {
             newUser.confirmEmail();
         }
 
-        // 4 — Persistência
         AuthUser persisted = saveAuthUserPort.save(newUser);
 
         log.debug(
@@ -104,7 +104,6 @@ public class RegisterUserService implements RegisterUserUseCase {
                 persisted.status()
         );
 
-        // 5 — Envia e-mail de verificação se necessário
         if (!command.autoConfirmEmail()) {
             String token = UUID.randomUUID().toString();
             verificationTokenStorePort.store(persisted, token);
@@ -122,7 +121,6 @@ public class RegisterUserService implements RegisterUserUseCase {
             );
         }
 
-        // 6 — Evento de domínio
         publishAuthEventPort.publish(new UserRegisteredEvent(persisted));
 
         log.debug(
@@ -133,7 +131,6 @@ public class RegisterUserService implements RegisterUserUseCase {
         return persisted;
     }
 
-    // Helpers
     private String maskToken(String token) {
         if (token == null || token.isBlank()) return "***";
         return token.length() > 10

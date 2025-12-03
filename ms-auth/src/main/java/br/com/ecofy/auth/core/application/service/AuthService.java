@@ -1,6 +1,8 @@
 package br.com.ecofy.auth.core.application.service;
 
 import br.com.ecofy.auth.config.JwtProperties;
+import br.com.ecofy.auth.core.application.exception.AuthErrorCode;
+import br.com.ecofy.auth.core.application.exception.AuthException;
 import br.com.ecofy.auth.core.domain.AuthUser;
 import br.com.ecofy.auth.core.domain.ClientApplication;
 import br.com.ecofy.auth.core.domain.JwtToken;
@@ -108,7 +110,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                             "[AuthService] - [authenticate] -> client_id inválido clientId={}",
                             command.clientId()
                     );
-                    return new IllegalArgumentException("Invalid client_id");
+                    return new AuthException(AuthErrorCode.CLIENT_NOT_FOUND, "Invalid client_id");
                 });
 
         validateClientForPasswordGrant(client);
@@ -120,7 +122,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                             "[AuthService] - [authenticate] -> Credenciais inválidas (usuário não encontrado) username={}",
                             command.username()
                     );
-                    return new IllegalArgumentException("Invalid credentials");
+                    return new AuthException(AuthErrorCode.INVALID_CREDENTIALS, "Invalid credentials");
                 });
 
         if (!passwordHashingPort.matches(command.password(), user.passwordHash())) {
@@ -129,7 +131,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [authenticate] -> Senha inválida username={} failedAttempts={}",
                     command.username(), user.failedLoginAttempts()
             );
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new AuthException(AuthErrorCode.INVALID_CREDENTIALS, "Invalid credentials");
         }
 
         user.registerSuccessfulLogin();
@@ -185,7 +187,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                             "[AuthService] - [refresh] -> Refresh token não encontrado tokenMask={}",
                             maskedToken
                     );
-                    return new IllegalArgumentException("Invalid refresh token");
+                    return new AuthException(AuthErrorCode.TOKEN_NOT_FOUND, "Invalid refresh token");
                 });
 
         if (!stored.isActive()) {
@@ -193,7 +195,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [refresh] -> Refresh token expirado ou revogado tokenMask={}",
                     maskedToken
             );
-            throw new IllegalArgumentException("Refresh token expired or revoked");
+            throw new AuthException(AuthErrorCode.TOKEN_EXPIRED, "Refresh token expired or revoked");
         }
 
         Map<String, Object> claims = jwtTokenProviderPort.parseClaims(stored.tokenValue());
@@ -204,7 +206,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [refresh] -> Token de tipo inválido para fluxo de refresh typ={} tokenMask={}",
                     rawType, maskedToken
             );
-            throw new IllegalArgumentException("Invalid token type for refresh flow");
+            throw new AuthException(AuthErrorCode.TOKEN_TYPE_NOT_SUPPORTED_FOR_REVOCATION, "Invalid token type for refresh flow");
         }
 
         String userId = (String) claims.get("sub");
@@ -215,7 +217,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [refresh] -> Claims de refresh token malformadas tokenMask={}",
                     maskedToken
             );
-            throw new IllegalArgumentException("Malformed refresh token claims");
+            throw new AuthException(AuthErrorCode.INVALID_TOKEN_SIGNATURE, "Malformed refresh token claims");
         }
 
         if (!stored.clientId().equals(command.clientId()) || !clientIdFromClaims.equals(command.clientId())) {
@@ -223,7 +225,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [refresh] -> Refresh token não pertence ao client armazenadoClientId={} claimsClientId={} commandClientId={} tokenMask={}",
                     stored.clientId(), clientIdFromClaims, command.clientId(), maskedToken
             );
-            throw new IllegalArgumentException("Refresh token does not belong to client");
+            throw new AuthException(AuthErrorCode.TOKEN_OWNER_MISMATCH, "Refresh token does not belong to client");
         }
 
         ClientApplication client = loadClientApplicationByClientIdPort
@@ -233,7 +235,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                             "[AuthService] - [refresh] -> Client não encontrado para fluxo de refresh clientId={}",
                             command.clientId()
                     );
-                    return new IllegalArgumentException("Client not found for refresh flow");
+                    return new AuthException(AuthErrorCode.CLIENT_NOT_FOUND, "Client not found for refresh flow");
                 });
 
         validateClientForRefreshGrant(client);
@@ -283,7 +285,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [validateClientForPasswordGrant] -> Client inativo clientId={}",
                     client.clientId()
             );
-            throw new IllegalArgumentException("Client is inactive");
+            throw new AuthException(AuthErrorCode.CLIENT_INACTIVE, "Client is inactive");
         }
 
         if (!client.supportsGrant(GrantType.PASSWORD)) {
@@ -291,7 +293,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [validateClientForPasswordGrant] -> Client não suporta PASSWORD grant clientId={}",
                     client.clientId()
             );
-            throw new IllegalArgumentException("Client does not support PASSWORD grant");
+            throw new AuthException(AuthErrorCode.CLIENT_NOT_ALLOWED_FOR_GRANT_TYPE, "Client does not support PASSWORD grant");
         }
 
         ClientType type = client.clientType();
@@ -300,7 +302,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [validateClientForPasswordGrant] -> Tipo de client não permitido para PASSWORD grant clientId={} type={}",
                     client.clientId(), type
             );
-            throw new IllegalArgumentException("Client type not allowed for PASSWORD grant");
+            throw new AuthException(AuthErrorCode.CLIENT_NOT_ALLOWED_FOR_GRANT_TYPE, "Client type not allowed for PASSWORD grant");
         }
     }
 
@@ -311,7 +313,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [validateClientForRefreshGrant] -> Client inativo clientId={}",
                     client.clientId()
             );
-            throw new IllegalArgumentException("Client is inactive");
+            throw new AuthException(AuthErrorCode.CLIENT_INACTIVE, "Client is inactive");
         }
 
         if (!client.supportsGrant(GrantType.REFRESH_TOKEN)) {
@@ -319,7 +321,7 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
                     "[AuthService] - [validateClientForRefreshGrant] -> Client não suporta REFRESH_TOKEN grant clientId={}",
                     client.clientId()
             );
-            throw new IllegalArgumentException("Client does not support REFRESH_TOKEN grant");
+            throw new AuthException(AuthErrorCode.CLIENT_NOT_ALLOWED_FOR_GRANT_TYPE, "Client does not support REFRESH_TOKEN grant");
         }
     }
 

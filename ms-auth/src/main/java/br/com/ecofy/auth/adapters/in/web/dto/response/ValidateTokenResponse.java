@@ -1,4 +1,4 @@
-package br.com.ecofy.auth.adapters.in.web.dto;
+package br.com.ecofy.auth.adapters.in.web.dto.response;
 
 import java.util.Map;
 

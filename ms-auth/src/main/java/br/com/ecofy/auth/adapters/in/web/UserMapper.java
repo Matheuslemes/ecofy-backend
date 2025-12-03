@@ -1,6 +1,6 @@
 package br.com.ecofy.auth.adapters.in.web;
 
-import br.com.ecofy.auth.adapters.in.web.dto.UserResponse;
+import br.com.ecofy.auth.adapters.in.web.dto.response.UserResponse;
 import br.com.ecofy.auth.core.domain.AuthUser;
 
 import java.util.Collections;

@@ -1,7 +1,7 @@
 package br.com.ecofy.auth.adapters.in.web;
 
-import br.com.ecofy.auth.adapters.in.web.dto.PasswordResetConfirmRequest;
-import br.com.ecofy.auth.adapters.in.web.dto.PasswordResetRequest;
+import br.com.ecofy.auth.adapters.in.web.dto.request.PasswordResetConfirmRequest;
+import br.com.ecofy.auth.adapters.in.web.dto.request.PasswordResetRequest;
 import br.com.ecofy.auth.core.port.in.RequestPasswordResetUseCase;
 import br.com.ecofy.auth.core.port.in.ResetPasswordUseCase;
 import io.swagger.v3.oas.annotations.Operation;

@@ -1,5 +1,7 @@
 package br.com.ecofy.auth.core.application.service;
 
+import br.com.ecofy.auth.core.application.exception.AuthErrorCode;
+import br.com.ecofy.auth.core.application.exception.AuthException;
 import br.com.ecofy.auth.core.domain.JwkKey;
 import br.com.ecofy.auth.core.port.in.GetJwksUseCase;
 import br.com.ecofy.auth.core.port.out.JwksRepositoryPort;
@@ -37,6 +39,10 @@ public class JwksService implements GetJwksUseCase {
 
         if (keys.isEmpty()) {
             log.warn("[JwksService] - [getJwks] -> Nenhuma JWK ativa encontrada.");
+            throw new AuthException(
+                    AuthErrorCode.JWKS_NOT_AVAILABLE,
+                    "No active signing keys available"
+            );
         } else {
             log.debug(
                     "[JwksService] - [getJwks] -> {} chave(s) ativa(s) encontrada(s).",
@@ -44,7 +50,6 @@ public class JwksService implements GetJwksUseCase {
             );
         }
 
-        // Mapeia JwkKey -> JSON format JWKS entries
         List<Map<String, Object>> jwkList = keys.stream()
                 .map(this::convertToJwkEntry)
                 .toList();
@@ -59,14 +64,6 @@ public class JwksService implements GetJwksUseCase {
         return response;
     }
 
-    /**
-     * Converte nosso JwkKey do domínio para o formato JWKS.
-     * Importante: por agora só devolvemos informações mínimas.
-     * Quando o adapter fornecer "n" e "e" (partes públicas RSA),
-     * basta adicionar aqui:
-     *      m.put("n", rsaModulusBase64Url);
-     *      m.put("e", rsaExponentBase64Url);
-     */
     private Map<String, Object> convertToJwkEntry(JwkKey key) {
         Map<String, Object> m = new LinkedHashMap<>();
 
@@ -79,10 +76,6 @@ public class JwksService implements GetJwksUseCase {
                 "[JwksService] - [convertToJwkEntry] -> Convertendo keyId={} alg={} use={}",
                 key.keyId(), key.algorithm(), key.use()
         );
-
-        // futuro: extrair modulus/base64url do PEM e incluir:
-        // m.put("n", key.rsaModulus());
-        // m.put("e", key.rsaExponent());
 
         return m;
     }

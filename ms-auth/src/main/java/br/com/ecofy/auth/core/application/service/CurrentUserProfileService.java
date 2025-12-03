@@ -1,5 +1,7 @@
 package br.com.ecofy.auth.core.application.service;
 
+import br.com.ecofy.auth.core.application.exception.AuthErrorCode;
+import br.com.ecofy.auth.core.application.exception.AuthException;
 import br.com.ecofy.auth.core.domain.AuthUser;
 import br.com.ecofy.auth.core.port.in.GetCurrentUserProfileUseCase;
 import br.com.ecofy.auth.core.port.out.CurrentUserProviderPort;
@@ -28,16 +30,24 @@ public class CurrentUserProfileService implements GetCurrentUserProfileUseCase {
     public AuthUser getCurrentUser() {
         log.debug("[CurrentUserProfileService] - [getCurrentUser] -> Buscando usuário autenticado…");
 
-        AuthUser user = currentUserProviderPort.getCurrentUserOrThrow();
+        try {
+            AuthUser user = currentUserProviderPort.getCurrentUserOrThrow();
 
-        log.debug(
-                "[CurrentUserProfileService] - [getCurrentUser] -> Usuário autenticado id={} email={} status={}",
-                user.id().value(),
-                user.email().value(),
-                user.status()
-        );
+            log.debug(
+                    "[CurrentUserProfileService] - [getCurrentUser] -> Usuário autenticado id={} email={} status={}",
+                    user.id().value(),
+                    user.email().value(),
+                    user.status()
+            );
 
-        return user;
+            return user;
+        } catch (RuntimeException ex) {
+            throw new AuthException(
+                    AuthErrorCode.CURRENT_USER_NOT_AUTHENTICATED,
+                    "No authenticated user found",
+                    ex
+            );
+        }
     }
 
 }

@@ -1,6 +1,6 @@
 package br.com.ecofy.auth.adapters.in.web;
 
-import br.com.ecofy.auth.adapters.in.web.dto.ClientApplicationResponse;
+import br.com.ecofy.auth.adapters.in.web.dto.response.ClientApplicationResponse;
 import br.com.ecofy.auth.core.domain.ClientApplication;
 import br.com.ecofy.auth.core.domain.enums.GrantType;
 
