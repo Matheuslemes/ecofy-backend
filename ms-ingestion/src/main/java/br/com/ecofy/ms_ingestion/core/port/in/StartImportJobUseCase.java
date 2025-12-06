@@ -1,0 +1,13 @@
+package br.com.ecofy.ms_ingestion.core.port.in;
+
+import br.com.ecofy.ms_ingestion.core.domain.ImportJob;
+
+import java.util.UUID;
+
+public interface StartImportJobUseCase {
+
+    record StartImportJobCommand(UUID importFileId) {}
+
+    ImportJob start(StartImportJobCommand command);
+
+}

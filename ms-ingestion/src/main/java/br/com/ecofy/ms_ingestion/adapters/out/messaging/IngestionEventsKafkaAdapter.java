@@ -1,0 +1,40 @@
+package br.com.ecofy.ms_ingestion.adapters.out.messaging;
+
+import br.com.ecofy.ms_ingestion.config.KafkaConfig;
+import br.com.ecofy.ms_ingestion.core.domain.event.ImportJobStatusChangedEvent;
+import br.com.ecofy.ms_ingestion.core.domain.event.TransactionsImportedEvent;
+import br.com.ecofy.ms_ingestion.core.port.out.PublishIngestionEventPort;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+public class IngestionEventsKafkaAdapter implements PublishIngestionEventPort {
+
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaConfig.IngestionTopics topics;
+
+    public IngestionEventsKafkaAdapter(KafkaTemplate<String, Object> kafkaTemplate,
+                                       KafkaConfig.IngestionTopics topics) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.topics = topics;
+    }
+
+    @Override
+    public void publish(TransactionsImportedEvent event) {
+        String topic = topics.getTransactionImported();
+        log.info("[IngestionEventsKafkaAdapter] - [publish] -> TransactionsImportedEvent jobId={} topic={}",
+                event.importJobId(), topic);
+        kafkaTemplate.send(topic, event.importJobId().toString(), event);
+    }
+
+    @Override
+    public void publish(ImportJobStatusChangedEvent event) {
+        String topic = topics.getTransactionImported(); // ou outro tópico específico
+        log.info("[IngestionEventsKafkaAdapter] - [publish] -> ImportJobStatusChangedEvent jobId={} newStatus={} topic={}",
+                event.importJobId(), event.newStatus(), topic);
+        kafkaTemplate.send(topic, event.importJobId().toString(), event);
+    }
+
+}
