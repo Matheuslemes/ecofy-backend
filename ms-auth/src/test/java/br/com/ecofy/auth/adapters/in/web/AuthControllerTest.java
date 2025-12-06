@@ -47,15 +47,18 @@ class AuthControllerTest {
 
     @BeforeEach
     void setUp() {
+
         controller = new AuthController(
                 authenticateUserUseCase,
                 refreshTokenUseCase,
                 revokeTokenUseCase,
                 validateTokenUseCase
         );
+
     }
 
     private AuthenticateUserUseCase.AuthenticationResult mockAuthResult() {
+
         // Deep stubs para poder fazer result.accessToken().value()
         AuthenticateUserUseCase.AuthenticationResult result =
                 mock(AuthenticateUserUseCase.AuthenticationResult.class, Answers.RETURNS_DEEP_STUBS);
@@ -66,9 +69,11 @@ class AuthControllerTest {
         when(result.expiresInSeconds()).thenReturn(3600L);
 
         return result;
+
     }
 
     private RefreshTokenUseCase.RefreshTokenResult mockRefreshResult() {
+
         RefreshTokenUseCase.RefreshTokenResult result =
                 mock(RefreshTokenUseCase.RefreshTokenResult.class);
 
@@ -77,17 +82,21 @@ class AuthControllerTest {
         when(result.expiresInSeconds()).thenReturn(7200L);
 
         return result;
+
     }
 
     private void assertNoStoreHeaders(HttpHeaders headers) {
+
         // Só garante que o controller configurou algo em Cache-Control
         assertNotNull(headers.getCacheControl());
         // E que está usando o header legado para evitar cache
         assertEquals("no-cache", headers.getFirst("Pragma"));
+
     }
 
     @Test
     void token_shouldUseXForwardedFor_whenPresentAndReturnTokenResponse() {
+
         // Arrange
         LoginRequest request = new LoginRequest(
                 "client-1",
@@ -132,10 +141,12 @@ class AuthControllerTest {
         assertEquals("openid profile", cmd.scope());
         // Não validamos clientIp aqui porque a estrutura do record/ordem dos campos
         // não está garantida neste contexto de teste.
+
     }
 
     @Test
     void token_shouldUseXRealIp_whenXForwardedForIsMissing() {
+
         // Arrange
         LoginRequest request = new LoginRequest(
                 "client-2",
@@ -168,10 +179,12 @@ class AuthControllerTest {
         AuthenticateUserUseCase.AuthenticationCommand cmd = captor.getValue();
         assertEquals("client-2", cmd.clientId());
         assertEquals("secret-2", cmd.clientSecret());
+
     }
 
     @Test
     void token_shouldUseRemoteAddr_whenNoIpHeadersPresent() {
+
         // Arrange
         LoginRequest request = new LoginRequest(
                 "client-3",
@@ -202,10 +215,12 @@ class AuthControllerTest {
         AuthenticateUserUseCase.AuthenticationCommand cmd = captor.getValue();
         assertEquals("client-3", cmd.clientId());
         assertEquals("secret-3", cmd.clientSecret());
+
     }
 
     @Test
     void refresh_shouldReturnNewTokenAndNoStoreHeaders() {
+
         // Arrange
         RefreshTokenRequest request = new RefreshTokenRequest(
                 "client-refresh",
@@ -239,10 +254,12 @@ class AuthControllerTest {
         assertEquals("client-refresh", cmd.clientId());
         assertEquals("refresh-token-xyz", cmd.refreshToken());
         assertEquals("openid", cmd.scope());
+
     }
 
     @Test
     void revoke_shouldTreatNullRefreshFlagAsRefreshToken() {
+
         // refreshToken == null → isRefresh = true dentro do controller
         RevokeTokenRequest request = new RevokeTokenRequest(
                 "token-to-revoke-1",
@@ -264,10 +281,12 @@ class AuthControllerTest {
 
         assertEquals("token-to-revoke-1", cmd.token());
         assertTrue(cmd.refreshToken(), "Quando refreshToken é null deve considerar como refresh token");
+
     }
 
     @Test
     void revoke_shouldTreatFalseRefreshFlagAsAccessToken() {
+
         // refreshToken == false → isRefresh = false
         RevokeTokenRequest request = new RevokeTokenRequest(
                 "token-to-revoke-2",
@@ -289,10 +308,12 @@ class AuthControllerTest {
 
         assertEquals("token-to-revoke-2", cmd.token());
         assertFalse(cmd.refreshToken(), "Quando refreshToken é false deve ser tratado como access token");
+
     }
 
     @Test
     void validate_shouldReturnClaimsAndNoStoreHeaders() {
+
         // Arrange
         ValidateTokenRequest request = new ValidateTokenRequest("valid-token-123");
 
@@ -317,5 +338,7 @@ class AuthControllerTest {
         assertNoStoreHeaders(response.getHeaders());
 
         verify(validateTokenUseCase).validate("valid-token-123");
+
     }
+
 }

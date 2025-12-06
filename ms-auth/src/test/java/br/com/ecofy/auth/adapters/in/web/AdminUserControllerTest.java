@@ -37,13 +37,16 @@ class AdminUserControllerTest {
     }
 
     private void setupRequestContext(String uri) {
+
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI(uri);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
     }
 
     @Test
     void createAdmin_shouldCreateUserWithDefaultRolesAndLocale_whenRolesAndLocaleAreNull() {
+
         // Arrange
         setupRequestContext("/api/admin/users");
 
@@ -52,8 +55,8 @@ class AdminUserControllerTest {
                 "StrongPass123!",
                 "Admin",
                 "User",
-                null,   // locale null -> deve usar padrão interno (pt-BR na variável local)
-                null    // roles null -> deve usar AUTH_ADMIN, AUTH_USER na variável local
+                null,
+                null
         );
 
         // Mock do usuário de domínio retornado pelo use case
@@ -101,11 +104,14 @@ class AdminUserControllerTest {
             assertNull(cmd.locale(), "Locale no command deve ser null neste cenário");
 
             assertNotNull(cmd.roles(), "Roles no command não pode ser nulo");
+
         }
+
     }
 
     @Test
     void createAdmin_shouldCreateUserWithProvidedRolesAndLocale_whenTheyArePresent() {
+
         // Arrange
         setupRequestContext("/api/admin/users");
 
@@ -116,8 +122,8 @@ class AdminUserControllerTest {
                 "AnotherStrongPass!23",
                 "Root",
                 "User",
-                "en-US",        // locale explícito
-                customRoles     // roles explícitas
+                "en-US",
+                customRoles
         );
 
         AuthUser domainUser = mock(AuthUser.class, Answers.RETURNS_DEEP_STUBS);
@@ -162,6 +168,9 @@ class AdminUserControllerTest {
             assertEquals("en-US", cmd.locale());
 
             assertNotNull(cmd.roles(), "Roles no command não pode ser nulo");
+
         }
+
     }
+
 }
