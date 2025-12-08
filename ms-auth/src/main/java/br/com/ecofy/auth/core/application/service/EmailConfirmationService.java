@@ -13,20 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
-/**
- * Serviço responsável pela confirmação de e-mail de usuários recém-registrados.
-
- * Atua diretamente no fluxo de verificação de e-mail:
- *   - Consome tokens de verificação armazenados no VerificationTokenStorePort
- *   - Atualiza o estado do usuário para "email confirmado"
- *   - Persiste modificações no agregado AuthUser
- *   - Publica o evento de domínio UserEmailConfirmedEvent
-
- * Observações:
- *   - Tokens consumidos deixam de ser válidos imediatamente (one-time-use)
- *   - Não expõe o token real nos logs (apenas versão mascarada)
- *   - Pode ser estendido futuramente para lógica adicional pós-confirmação
- */
+// Serviço responsável pela confirmação de e-mail de usuários recém-registrados.
 @Slf4j
 @Service
 public class EmailConfirmationService implements ConfirmEmailUseCase {

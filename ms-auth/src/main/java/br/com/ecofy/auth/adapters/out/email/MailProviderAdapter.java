@@ -91,7 +91,6 @@ public class MailProviderAdapter implements SendVerificationEmailPort, SendReset
         sendMail(message, "reset de senha", user);
     }
 
-    // Helpers
     private SimpleMailMessage baseMessage(AuthUser user) {
         String from = Objects.requireNonNullElse(props.getFrom(), "no-reply@ecofy.local");
 

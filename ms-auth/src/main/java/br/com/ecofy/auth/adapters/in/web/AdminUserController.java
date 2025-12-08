@@ -65,12 +65,10 @@ public class AdminUserController {
 
         log.debug("[AdminUserController] - [createAdmin] -> Criando usuário admin email={}", request.email());
 
-        // Roles padrão se não forem enviadas
         List<String> roles = (request.roles() == null || request.roles().isEmpty())
                 ? List.of("AUTH_ADMIN", "AUTH_USER")
                 : request.roles();
 
-        // Locale padrão
         String locale = request.locale() != null ? request.locale() : "pt-BR";
 
 

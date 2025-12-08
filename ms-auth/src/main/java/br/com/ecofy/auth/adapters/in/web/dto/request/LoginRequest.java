@@ -7,7 +7,6 @@ public record LoginRequest(
         @NotBlank
         String clientId,
 
-        // pode ser null em client public
         String clientSecret,
 
         @NotBlank

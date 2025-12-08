@@ -11,21 +11,24 @@ public record ImportJobResponse(
         UUID importFileId,
         ImportJobStatus status,
         int totalRecords,
-        int successRecords,
-        int errorRecords,
+        int processedRecords,
+        int successCount,
+        int errorCount,
         Instant startedAt,
         Instant finishedAt,
         Instant createdAt,
         Instant updatedAt
 ) {
+
     public static ImportJobResponse fromDomain(ImportJob job) {
         return new ImportJobResponse(
                 job.id(),
                 job.importFileId(),
                 job.status(),
                 job.totalRecords(),
-                job.successRecords(),
-                job.errorRecords(),
+                job.processedRecords(),
+                job.successCount(),
+                job.errorCount(),
                 job.startedAt(),
                 job.finishedAt(),
                 job.createdAt(),

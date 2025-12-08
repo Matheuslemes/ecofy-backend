@@ -13,13 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Serviço responsável por montar o JWKS exposto em:
- *      /.well-known/jwks.json
- * Esta implementação trata apenas metadados mínimos (kid, alg, use),
- * mas está preparada para incluir parâmetros completos RSA (n, e)
- * assim que o adapter de persistência fornecer esses valores.
- */
+// Serviço responsável por montar o JWKS exposto em:
 @Slf4j
 @Service
 public class JwksService implements GetJwksUseCase {

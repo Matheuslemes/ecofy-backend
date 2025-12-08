@@ -17,17 +17,24 @@ public class TransactionEventIngestionService implements IngestTransactionEventU
 
     public TransactionEventIngestionService(SaveRawTransactionPort saveRawTransactionPort,
                                             PublishTransactionForCategorizationPort publishTransactionForCategorizationPort) {
-        this.saveRawTransactionPort = Objects.requireNonNull(saveRawTransactionPort);
-        this.publishTransactionForCategorizationPort = Objects.requireNonNull(publishTransactionForCategorizationPort);
+        this.saveRawTransactionPort = Objects.requireNonNull(saveRawTransactionPort, "saveRawTransactionPort must not be null");
+        this.publishTransactionForCategorizationPort =
+                Objects.requireNonNull(publishTransactionForCategorizationPort, "publishTransactionForCategorizationPort must not be null");
     }
 
     @Override
     public void ingest(IngestEventCommand command) {
         Objects.requireNonNull(command, "command must not be null");
-        List<RawTransaction> transactions = command.transactions();
 
-        log.info("[TransactionEventIngestionService] - [ingest] -> Ingerindo evento sourceSystem={} payloadId={} totalTx={}",
-                command.sourceSystem(), command.payloadId(), transactions.size());
+        List<RawTransaction> transactions = Objects.requireNonNull(
+                command.transactions(),
+                "transactions must not be null"
+        );
+
+        log.info(
+                "[TransactionEventIngestionService] - [ingest] -> Ingerindo evento sourceSystem={} payloadId={} totalTx={}",
+                command.sourceSystem(), command.payloadId(), transactions.size()
+        );
 
         if (transactions.isEmpty()) {
             log.warn("[TransactionEventIngestionService] - [ingest] -> Nenhuma transação no payload");

@@ -2,12 +2,7 @@ package br.com.ecofy.auth.core.domain;
 
 import java.util.*;
 
-/**
- * Papel de autorização do sistema, representando um conjunto de {@link Permission}.
- *
- * Convenção:
- * - name: geralmente no padrão "ROLE_ADMIN", "ROLE_USER", etc.
- */
+// Papel de autorização do sistema, representando um conjunto de {@link Permission}.
 public final class Role {
 
     private final String name; // ex.: ROLE_ADMIN, ROLE_USER

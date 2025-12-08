@@ -12,6 +12,7 @@ import br.com.ecofy.ms_ingestion.core.port.in.StartImportJobUseCase;
 import br.com.ecofy.ms_ingestion.core.port.out.*;
 import lombok.extern.slf4j.Slf4j;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -43,19 +44,23 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
                                    PublishTransactionForCategorizationPort publishTransactionForCategorizationPort,
                                    PublishIngestionEventPort publishIngestionEventPort,
                                    IngestionProperties ingestionProperties) {
-        this.saveImportJobPort = Objects.requireNonNull(saveImportJobPort);
-        this.loadImportJobPort = Objects.requireNonNull(loadImportJobPort);
-        this.saveRawTransactionPort = Objects.requireNonNull(saveRawTransactionPort);
-        this.saveImportErrorPort = Objects.requireNonNull(saveImportErrorPort);
-        this.saveImportFilePort = Objects.requireNonNull(saveImportFilePort);
-        this.fileContentLoaderPort = Objects.requireNonNull(fileContentLoaderPort);
-        this.parseCsvPort = Objects.requireNonNull(parseCsvPort);
-        this.parseOfxPort = Objects.requireNonNull(parseOfxPort);
-        this.publishTransactionForCategorizationPort = Objects.requireNonNull(publishTransactionForCategorizationPort);
-        this.publishIngestionEventPort = Objects.requireNonNull(publishIngestionEventPort);
-        this.ingestionProperties = Objects.requireNonNull(ingestionProperties);
+
+        this.saveImportJobPort = Objects.requireNonNull(saveImportJobPort, "saveImportJobPort must not be null");
+        this.loadImportJobPort = Objects.requireNonNull(loadImportJobPort, "loadImportJobPort must not be null");
+        this.saveRawTransactionPort = Objects.requireNonNull(saveRawTransactionPort, "saveRawTransactionPort must not be null");
+        this.saveImportErrorPort = Objects.requireNonNull(saveImportErrorPort, "saveImportErrorPort must not be null");
+        this.saveImportFilePort = Objects.requireNonNull(saveImportFilePort, "saveImportFilePort must not be null");
+        this.fileContentLoaderPort = Objects.requireNonNull(fileContentLoaderPort, "fileContentLoaderPort must not be null");
+        this.parseCsvPort = Objects.requireNonNull(parseCsvPort, "parseCsvPort must not be null");
+        this.parseOfxPort = Objects.requireNonNull(parseOfxPort, "parseOfxPort must not be null");
+        this.publishTransactionForCategorizationPort =
+                Objects.requireNonNull(publishTransactionForCategorizationPort, "publishTransactionForCategorizationPort must not be null");
+        this.publishIngestionEventPort =
+                Objects.requireNonNull(publishIngestionEventPort, "publishIngestionEventPort must not be null");
+        this.ingestionProperties = Objects.requireNonNull(ingestionProperties, "ingestionProperties must not be null");
     }
 
+    // INÍCIO DO JOB
     @Override
     public ImportJob start(StartImportJobCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -63,7 +68,6 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
 
         log.info("[ImportProcessingService] - [start] -> Iniciando job para importFileId={}", importFileId);
 
-        // carrega ImportJob ou cria se não existir
         ImportJob job = ImportJob.create(importFileId);
         job = saveImportJobPort.save(job);
 
@@ -72,92 +76,144 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
         return job;
     }
 
+    // PROCESSAMENTO PRINCIPAL DO JOB
     private void processJob(ImportJob job) {
-        ImportJobStatus oldStatus = job.status();
+        Objects.requireNonNull(job, "job must not be null");
+
+        ImportJobStatus previousStatus = job.status();
         job.markRunning();
         saveImportJobPort.save(job);
 
-        publishIngestionEventPort.publish(new ImportJobStatusChangedEvent(
-                job.id(), oldStatus, job.status(), job.updatedAt()
-        ));
+        publishIngestionEventPort.publish(
+                new ImportJobStatusChangedEvent(
+                        job.id(),
+                        previousStatus,
+                        job.status(),
+                        job.updatedAt()
+                )
+        );
 
         List<RawTransaction> allTransactions = new ArrayList<>();
-        List<ImportError> errors = new ArrayList<>();
+        List<ImportError> allErrors = new ArrayList<>();
 
         try {
-            // carregar ImportFile (metadados) via SaveImportFilePort → normalmente via adapter
-            // aqui simulamos recuperando path pelo ID usando o mesmo port.
-            // Em uma implementação real, haveria LoadImportFilePort separado.
-
-            // Padrão: FileEntity -> ImportFile -> path
-            // Vamos supor que SaveImportFilePort consegue nos devolver por ID na infra real.
-            // Para fins de domínio, seguimos assim.
-
-            // carregar conteúdo
-            // Em projeto real, use outro port; aqui só demonstrativo:
-            // String path = importFile.storedPath();
-            // byte[] bytes = fileContentLoaderPort.load(path);
-
-            // Para simplificar o domínio aqui, assumiremos que adapter fará isso
-            // via SaveImportJobPort/LoadImportJobPort + FilePort.
-
-            // LOG
             log.info("[ImportProcessingService] - [processJob] -> Processando job id={}", job.id());
 
-            // parse dummy (adapter real vai decidir CSV/OFX pelo ImportFile)
-            // Aqui, você chamaria ParseCsvPort/ParseOfxPort conforme tipo:
-            // List<RawTransaction> parsed = parseCsvPort.parse(job, csvContent);
+            // 1) Carrega o conteúdo do arquivo via storage
+            byte[] fileBytes = fileContentLoaderPort.load(String.valueOf(job.importFileId()));
+            String fileContent = new String(fileBytes, StandardCharsets.UTF_8);
 
-            // Como faltam alguns ports de leitura completa de ImportFile,
-            // vamos assumir que o adapter de aplicação chamará processJob(Job) com
-            // tudo que precisa já resolvido. Fica o gancho pronto.
+            // 2) Tenta parsear como CSV; se falhar, tenta OFX
+            List<RawTransaction> parsedTransactions;
+            List<ImportError> parsedErrors = new ArrayList<>(); // hook p/ validações futuras
 
-            // Ao final, salvar transações + erros
+            try {
+                parsedTransactions = parseCsvPort.parse(job, fileContent);
+            } catch (Exception csvEx) {
+                log.debug(
+                        "[ImportProcessingService] - [processJob] -> Falha ao parsear como CSV, tentando OFX jobId={} error={}",
+                        job.id(), csvEx.getMessage(), csvEx
+                );
+                parsedTransactions = parseOfxPort.parse(job, fileContent);
+            }
+
+            allTransactions.addAll(parsedTransactions);
+            allErrors.addAll(parsedErrors);
+
+            // 3) Persistir transações e publicar para categorização
             if (!allTransactions.isEmpty()) {
                 saveRawTransactionPort.saveAll(allTransactions);
+
                 publishTransactionForCategorizationPort.publish(allTransactions);
+
                 publishIngestionEventPort.publish(
-                        new TransactionsImportedEvent(job.id(),
-                                allTransactions.stream().map(RawTransaction::id).toList())
+                        new TransactionsImportedEvent(
+                                job.id(),
+                                allTransactions.stream().map(RawTransaction::id).toList()
+                        )
                 );
             }
 
-            if (!errors.isEmpty()) {
-                saveImportErrorPort.saveAll(errors);
+            // 4) Persistir erros, se existirem
+            if (!allErrors.isEmpty()) {
+                saveImportErrorPort.saveAll(allErrors);
             }
 
-            if (errors.isEmpty()) {
+            // 5) Atualizar status final do job com base em erros
+            if (allErrors.isEmpty()) {
                 job.markCompleted();
+            } else if (allErrors.size() > ingestionProperties.getMaxErrorsPerJob()) {
+                job.markFailed();
             } else {
-                if (errors.size() > ingestionProperties.getMaxErrorsPerJob()) {
-                    job.markFailed();
-                } else {
-                    job.markCompleted();
-                }
+                job.markCompletedWithErrors();
             }
 
             saveImportJobPort.save(job);
+
             publishIngestionEventPort.publish(
-                    new ImportJobStatusChangedEvent(job.id(), ImportJobStatus.RUNNING, job.status(), job.updatedAt())
+                    new ImportJobStatusChangedEvent(
+                            job.id(),
+                            ImportJobStatus.RUNNING,
+                            job.status(),
+                            job.updatedAt()
+                    )
             );
 
         } catch (Exception e) {
-            log.error("[ImportProcessingService] - [processJob] -> Erro ao processar job id={} error={}",
-                    job.id(), e.getMessage(), e);
+            log.error(
+                    "[ImportProcessingService] - [processJob] -> Erro ao processar job id={} error={}",
+                    job.id(), e.getMessage(), e
+            );
+
             job.markFailed();
             saveImportJobPort.save(job);
+
             publishIngestionEventPort.publish(
-                    new ImportJobStatusChangedEvent(job.id(), ImportJobStatus.RUNNING, job.status(), job.updatedAt())
+                    new ImportJobStatusChangedEvent(
+                            job.id(),
+                            ImportJobStatus.RUNNING,
+                            job.status(),
+                            job.updatedAt()
+                    )
             );
         }
     }
 
+    // RETRY DE JOBS COM FALHA / ERROS
     @Override
-    public void retry(RetryFailedImportsUseCase.RetryFailedImportsCommand command) {
-        // aqui normalmente buscaria jobs FAIL/PENDING no repositório (precisa de query extra),
-        // mas como ainda não definimos, deixo a assinatura pronta.
-        log.info("[ImportProcessingService] - [retry] -> Disparo de retry solicitado maxJobs={}",
-                command.maxJobs());
-        // Implementação real dependerá de queries em ImportJobRepository.
+    public void retry(RetryFailedImportsCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+
+        int maxJobs = command.maxJobs();
+        log.info("[ImportProcessingService] - [retry] -> Disparo de retry solicitado maxJobs={}", maxJobs);
+
+        // Requer que LoadImportJobPort tenha o método loadJobsToRetry(int maxJobs)
+        List<ImportJob> jobsToRetry = loadImportJobPort.loadJobsToRetry(maxJobs);
+
+        if (jobsToRetry.isEmpty()) {
+            log.info("[ImportProcessingService] - [retry] -> Nenhum job elegível para retry encontrado");
+            return;
+        }
+
+        log.info("[ImportProcessingService] - [retry] -> Encontrados {} jobs para retry", jobsToRetry.size());
+
+        for (ImportJob job : jobsToRetry) {
+            ImportJobStatus status = job.status();
+            if (status != ImportJobStatus.FAILED &&
+                    status != ImportJobStatus.COMPLETED_WITH_ERRORS) {
+
+                log.debug(
+                        "[ImportProcessingService] - [retry] -> Ignorando job id={} com status={}",
+                        job.id(), status
+                );
+                continue;
+            }
+
+            log.info(
+                    "[ImportProcessingService] - [retry] -> Reprocessando job id={} statusAtual={}",
+                    job.id(), status
+            );
+            processJob(job);
+        }
     }
 }

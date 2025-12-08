@@ -13,20 +13,14 @@ import org.springframework.context.annotation.Configuration;
 @ToString
 public class StorageProperties {
 
-    /**
-     * Diretório/basePath local onde os arquivos serão armazenados.
-     * Ex: /var/lib/ecofy/ingestion-files ou ./data/ingestion
-     */
+    //Diretório/basePath local onde os arquivos serão armazenados.
+    // Ex: /var/lib/ecofy/ingestion-files ou ./data/ingestion
     private String basePath = "./data/ingestion";
 
-    /**
-     * Tamanho máximo permitido por arquivo (em bytes).
-     */
+    // Tamanho máximo permitido por arquivo (em bytes).
     private long maxFileSizeBytes = 50 * 1024 * 1024; // 50 MB
 
-    /**
-     * Flag para deletar o arquivo após o processamento.
-     */
+    // Flag para deletar o arquivo após o processamento.
     private boolean deleteOnSuccess = false;
 
 }

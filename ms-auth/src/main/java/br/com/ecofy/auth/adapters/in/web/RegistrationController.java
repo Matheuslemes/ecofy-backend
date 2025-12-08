@@ -60,7 +60,7 @@ public class RegistrationController {
                 request.lastName(),
                 request.locale() != null ? request.locale() : "pt-BR",
                 false,
-                List.of("AUTH_USER") // em prod, normalmente não auto-confirma
+                List.of("AUTH_USER")
         );
 
         var user = registerUserUseCase.register(cmd);
@@ -70,7 +70,6 @@ public class RegistrationController {
 
         UserResponse body = UserMapper.toResponse(user);
 
-        // Location padrão apontando para o endpoint de perfil
         URI location = ServletUriComponentsBuilder
                 .fromCurrentContextPath()
                 .path("/api/user/me")

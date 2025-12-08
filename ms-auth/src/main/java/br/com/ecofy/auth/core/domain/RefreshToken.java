@@ -8,13 +8,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Modelo de refresh token mantido no domínio (mesmo se ele for JWT).
- * <p>
- * O valor pode ser:
- * - opaco (random/UUID/token criptográfico)
- * - JWT assinado
- */
+// Modelo de refresh token mantido no domínio (mesmo se ele for JWT).
 public class RefreshToken {
 
     /** Identificador interno do refresh token (UUID). */

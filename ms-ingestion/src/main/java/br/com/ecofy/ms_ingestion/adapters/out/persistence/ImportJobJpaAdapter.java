@@ -5,12 +5,16 @@ import br.com.ecofy.ms_ingestion.adapters.out.persistence.entity.ImportJobEntity
 import br.com.ecofy.ms_ingestion.adapters.out.persistence.repository.ImportFileRepository;
 import br.com.ecofy.ms_ingestion.adapters.out.persistence.repository.ImportJobRepository;
 import br.com.ecofy.ms_ingestion.core.domain.ImportJob;
+import br.com.ecofy.ms_ingestion.core.domain.enums.ImportJobStatus;
 import br.com.ecofy.ms_ingestion.core.port.out.LoadImportJobPort;
 import br.com.ecofy.ms_ingestion.core.port.out.SaveImportJobPort;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.*;
+import java.util.Comparator;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 public class ImportJobJpaAdapter implements SaveImportJobPort, LoadImportJobPort {
@@ -20,25 +24,55 @@ public class ImportJobJpaAdapter implements SaveImportJobPort, LoadImportJobPort
 
     public ImportJobJpaAdapter(ImportJobRepository importJobRepository,
                                ImportFileRepository importFileRepository) {
-        this.importJobRepository = importJobRepository;
-        this.importFileRepository = importFileRepository;
+
+        this.importJobRepository = Objects.requireNonNull(importJobRepository, "importJobRepository must not be null");
+        this.importFileRepository = Objects.requireNonNull(importFileRepository, "importFileRepository must not be null");
     }
 
     @Override
     @Transactional
     public ImportJob save(ImportJob job) {
+        Objects.requireNonNull(job, "job must not be null");
+
         ImportFileEntity fileEntity = importFileRepository.findById(job.importFileId())
-                .orElseThrow(() -> new IllegalArgumentException("ImportFile not found: " + job.importFileId()));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "ImportFile not found: " + job.importFileId()
+                ));
 
         ImportJobEntity entity = PersistenceMapper.toEntity(job, fileEntity);
         ImportJobEntity saved = importJobRepository.save(entity);
+
         return PersistenceMapper.toDomain(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<ImportJob> loadById(java.util.UUID jobId) {
+    public Optional<ImportJob> loadById(UUID jobId) {
+        Objects.requireNonNull(jobId, "jobId must not be null");
+
         return importJobRepository.findById(jobId)
                 .map(PersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ImportJob> loadJobsToRetry(int maxJobs) {
+        int limit = maxJobs <= 0 ? Integer.MAX_VALUE : maxJobs;
+
+        return importJobRepository.findAll().stream()
+                // elegíveis para retry: FAILED ou COMPLETED_WITH_ERRORS
+                .filter(entity -> {
+                    ImportJobStatus status = entity.getStatus();
+                    return status == ImportJobStatus.FAILED
+                            || status == ImportJobStatus.COMPLETED_WITH_ERRORS;
+                })
+                // processa primeiro os mais antigos (updatedAt nulo vai pro fim)
+                .sorted(Comparator.comparing(
+                        ImportJobEntity::getUpdatedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ))
+                .limit(limit)
+                .map(PersistenceMapper::toDomain)
+                .toList();
     }
 }

@@ -94,5 +94,4 @@ public class ClientApplicationController {
                 .body(body);
     }
 
-    // Opcionalmente, no futuro, você pode expor GET /{clientId} usando outra use case (ex: GetClientApplicationUseCase)
 }

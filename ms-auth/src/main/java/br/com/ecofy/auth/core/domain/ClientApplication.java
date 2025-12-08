@@ -6,15 +6,7 @@ import br.com.ecofy.auth.core.domain.enums.GrantType;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Agregado que representa um client OAuth2/OIDC registrado no ms-auth.
- * Responsável por encapsular:
- *  - tipo do client (confidential/public)
- *  - grants suportados
- *  - redirect URIs válidas
- *  - scopes permitidos
- *  - informações de auditoria (createdAt/updatedAt)
- */
+// Agregado que representa um client OAuth2/OIDC registrado no ms-auth.
 public class ClientApplication {
 
     /** Identificador interno (UUID string). Nunca exposto a clientes. */

@@ -46,7 +46,6 @@ public class SpringSecurityCurrentUserAdapter implements CurrentUserProviderPort
                 jwt.getSubject(), jwt.getId()
         );
 
-        // Converte SUB -> UUID com segurança
         UUID userId;
         try {
             userId = UUID.fromString(jwt.getSubject());

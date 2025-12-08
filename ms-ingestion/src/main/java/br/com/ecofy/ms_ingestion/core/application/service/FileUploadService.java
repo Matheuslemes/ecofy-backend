@@ -20,23 +20,34 @@ public class FileUploadService implements UploadFileUseCase {
     public FileUploadService(SaveImportFilePort saveImportFilePort,
                              StoreFilePort storeFilePort,
                              StorageProperties storageProperties) {
-        this.saveImportFilePort = Objects.requireNonNull(saveImportFilePort);
-        this.storeFilePort = Objects.requireNonNull(storeFilePort);
-        this.storageProperties = Objects.requireNonNull(storageProperties);
+        this.saveImportFilePort = Objects.requireNonNull(saveImportFilePort, "saveImportFilePort must not be null");
+        this.storeFilePort = Objects.requireNonNull(storeFilePort, "storeFilePort must not be null");
+        this.storageProperties = Objects.requireNonNull(storageProperties, "storageProperties must not be null");
     }
 
     @Override
-    public ImportFile upload(UploadFileUseCase.UploadFileCommand command) {
+    public ImportFile upload(UploadFileCommand command) {
         Objects.requireNonNull(command, "command must not be null");
 
-        log.info("[FileUploadService] - [upload] -> Recebendo arquivo name={} sizeBytes={}",
-                command.originalFileName(), command.sizeBytes());
+        log.info(
+                "[FileUploadService] - [upload] -> Recebendo arquivo name={} sizeBytes={}",
+                command.originalFileName(), command.sizeBytes()
+        );
+
+        if (command.sizeBytes() <= 0) {
+            throw new IllegalArgumentException("File size must be greater than zero");
+        }
 
         if (command.sizeBytes() > storageProperties.getMaxFileSizeBytes()) {
             throw new IllegalArgumentException("File too large");
         }
 
-        ImportFileType type = command.type();
+        ImportFileType type = Objects.requireNonNull(
+                command.type(),
+                "ImportFileType (type) must not be null for uploaded file"
+        );
+
+        // 1) Cria o agregado apenas com metadados (caminho ainda indefinido)
         ImportFile file = ImportFile.create(
                 command.originalFileName(),
                 "TO_BE_DEFINED",
@@ -44,13 +55,13 @@ public class FileUploadService implements UploadFileUseCase {
                 command.sizeBytes()
         );
 
-        // primeiro salva metadados para obter ID etc
+        // 2) Persiste metadados iniciais para garantir ID
         ImportFile persisted = saveImportFilePort.save(file);
 
-        // grava o conteúdo em storage
+        // 3) Grava conteúdo físico usando o ID/camadas de storage
         String storedPath = storeFilePort.store(persisted, command.content());
 
-        // recria objeto com path definitivo
+        // 4) Recria o agregado com o caminho definitivo
         ImportFile withPath = new ImportFile(
                 persisted.id(),
                 persisted.originalFileName(),
@@ -60,11 +71,14 @@ public class FileUploadService implements UploadFileUseCase {
                 persisted.uploadedAt()
         );
 
+        // 5) Atualiza o registro com o path final
         ImportFile finalFile = saveImportFilePort.save(withPath);
-        log.info("[FileUploadService] - [upload] -> Arquivo salvo com sucesso id={} path={}",
-                finalFile.id(), finalFile.storedPath());
+
+        log.info(
+                "[FileUploadService] - [upload] -> Arquivo salvo com sucesso id={} path={}",
+                finalFile.id(), finalFile.storedPath()
+        );
 
         return finalFile;
     }
-
 }

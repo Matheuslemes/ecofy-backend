@@ -4,11 +4,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 
-/**
- * Representação de uma chave pública exposta via JWKS no domínio.
- * Importante: aqui não há detalhes de implementação criptográfica, apenas
- * metadados necessários para publicação e rotação de chaves.
- */
+// Representação de uma chave pública exposta via JWKS no domínio.
 public class JwkKey {
 
     public static final String USE_SIGNING    = "sig";

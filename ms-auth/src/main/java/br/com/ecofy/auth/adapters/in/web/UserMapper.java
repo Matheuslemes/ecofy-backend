@@ -9,22 +9,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Mapper responsável por converter objetos de domínio {@link AuthUser}
- * para DTOs expostos nas APIs REST ({@link UserResponse}).
- */
 final class UserMapper {
 
-    private UserMapper() {
-        // util class
-    }
-
-    /**
-     * Converte um {@link AuthUser} para {@link UserResponse}.
-     *
-     * @param user usuário de domínio (não pode ser nulo)
-     * @return DTO pronto para ser retornado pela API
-     */
     static UserResponse toResponse(AuthUser user) {
         Objects.requireNonNull(user, "user must not be null");
 
@@ -50,12 +36,6 @@ final class UserMapper {
         );
     }
 
-    /**
-     * Converte uma lista de {@link AuthUser} para uma lista de {@link UserResponse}.
-     *
-     * @param users lista de usuários (pode ser nula, será tratada como vazia)
-     * @return lista imutável de DTOs
-     */
     static List<UserResponse> toResponseList(List<AuthUser> users) {
         if (users == null || users.isEmpty()) {
             return List.of();

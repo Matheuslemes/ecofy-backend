@@ -213,9 +213,6 @@ public class AuthController {
     }
 
 
-    /**
-     * Resolve IP real do cliente considerando cabeçalhos de proxy/gateway.
-     */
     private String resolveClientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
@@ -228,10 +225,6 @@ public class AuthController {
         return request.getRemoteAddr();
     }
 
-    /**
-     * Cabeçalhos recomendados pela RFC 6749 / OAuth2 para o endpoint de token.
-     * Impede cache de responses contendo tokens.
-     */
     private HttpHeaders oauthNoStoreHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setCacheControl(

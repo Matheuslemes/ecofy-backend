@@ -22,27 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Serviço responsável pelos fluxos de autenticação do MS Auth.
-
- * Funcionalidades principais:
- *  - Autenticação via PASSWORD grant (username + password)
- *  - Emissão de access token e refresh token seguindo TTLs definidos em {@link JwtProperties}
- *  - Validação de client applications conforme regras de ClientType × GrantType
- *  - Persistência e gerenciamento de refresh tokens via RefreshTokenStorePort
- *  - Publicação de eventos de domínio (ex.: {@link UserAuthenticatedEvent})
- *  - Fluxo completo de refresh token com verificação de claims, tipo e client vinculado
-
- * Extensível para:
- *  - Suporte a DEVICE_CODE, PKCE avançado ou flows customizados
- *  - Revogação centralizada via blacklist de JWT (Redis / Cache distribuído)
- *  - Inclusão de roles / permissions nos access tokens
-
- * Observações:
- *  - Nenhum token sensível é logado; sempre mascarado
- *  - Fail-fast em todas as dependências e comandos nulos
- *  - Todas as regras do domínio são centralizadas aqui, mantendo o core limpo
- */
+//Serviço responsável pelos fluxos de autenticação do MS Auth.
 @Slf4j
 @Service
 public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase {
@@ -54,10 +34,6 @@ public class AuthService implements AuthenticateUserUseCase, RefreshTokenUseCase
     private final RefreshTokenStorePort refreshTokenStorePort;
     private final PublishAuthEventPort publishAuthEventPort;
 
-    /**
-     * TTLs em segundos para access e refresh tokens.
-     * São carregados de {@link JwtProperties}.
-     */
     private final long accessTokenTtlSeconds;
     private final long refreshTokenTtlSeconds;
 

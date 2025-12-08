@@ -14,16 +14,9 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Configuração de Kafka específica para os eventos de autenticação.
- */
 @Configuration
 public class KafkaConfig {
 
-    /**
-     * ProducerFactory especializado para eventos de autenticação.
-     * Usa JsonSerializer com ObjectMapper do contexto.
-     */
     @Bean
     public ProducerFactory<String, Object> authEventProducerFactory(
             @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
@@ -47,15 +40,11 @@ public class KafkaConfig {
         return factory;
     }
 
-    /**
-     * KafkaTemplate que será injetado no adapter de eventos (AuthEventsKafkaAdapter).
-     */
     @Bean
     public KafkaTemplate<String, Object> authEventKafkaTemplate(
             ProducerFactory<String, Object> authEventProducerFactory
     ) {
         KafkaTemplate<String, Object> template = new KafkaTemplate<>(authEventProducerFactory);
-        // Pode sobrescrever o tópico no adapter, aqui é só um default
         template.setDefaultTopic("auth.events");
         return template;
     }

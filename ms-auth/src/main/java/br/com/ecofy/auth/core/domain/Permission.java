@@ -3,15 +3,7 @@ package br.com.ecofy.auth.core.domain;
 import java.util.Locale;
 import java.util.Objects;
 
-/**
- * Permissão granular do sistema, por exemplo: "transactions:read".
- * Convenções:
- * - name: permissão completa, ex.: "transactions:read", "users:write"
- * - domain: agrupador lógico (ex.: "transactions", "users" ou "*")
- * - wildcards:
- *   - "*" implica qualquer permissão
- *   - "transactions:*" implica qualquer perm em "transactions:*"
- */
+// Permissão granular do sistema, por exemplo: "transactions:read".
 public final class Permission {
 
     private final String name;

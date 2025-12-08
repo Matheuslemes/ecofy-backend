@@ -5,7 +5,6 @@ import br.com.ecofy.auth.core.port.out.PasswordHashingPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
@@ -31,7 +30,6 @@ public class BCryptPasswordHashingAdapter implements PasswordHashingPort {
 
         String encoded = passwordEncoder.encode(rawPassword);
 
-        // nunca logar o hash, apenas dizer que foi gerado
         log.debug("[BCryptPasswordHashingAdapter] - [hash] -> Hash gerado com sucesso");
 
         return new PasswordHash(encoded);

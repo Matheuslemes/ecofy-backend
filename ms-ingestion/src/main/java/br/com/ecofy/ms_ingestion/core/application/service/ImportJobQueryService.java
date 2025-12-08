@@ -15,23 +15,23 @@ import java.util.UUID;
 public class ImportJobQueryService implements GetImportJobStatusUseCase {
 
     private final LoadImportJobPort loadImportJobPort;
-    // Em uma implementação completa, teríamos LoadImportErrorPort
-    // Aqui mantemos simples (lista vazia) para manter o contrato.
+    // Em uma implementação completa, teríamos LoadImportErrorPort.
 
     public ImportJobQueryService(LoadImportJobPort loadImportJobPort) {
-        this.loadImportJobPort = Objects.requireNonNull(loadImportJobPort);
+        this.loadImportJobPort = Objects.requireNonNull(loadImportJobPort, "loadImportJobPort must not be null");
     }
 
     @Override
-    public GetImportJobStatusUseCase.ImportJobStatusView getById(UUID jobId) {
+    public ImportJobStatusView getById(UUID jobId) {
+        Objects.requireNonNull(jobId, "jobId must not be null");
         log.debug("[ImportJobQueryService] - [getById] -> Buscando status de job jobId={}", jobId);
 
         ImportJob job = loadImportJobPort.loadById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("ImportJob not found"));
 
-        List<ImportError> errors = Collections.emptyList(); // placeholder
+        // TODO: quando existir LoadImportErrorPort, carregar erros reais do job.
+        List<ImportError> errors = Collections.emptyList();
 
         return new ImportJobStatusView(job, errors);
     }
-
 }

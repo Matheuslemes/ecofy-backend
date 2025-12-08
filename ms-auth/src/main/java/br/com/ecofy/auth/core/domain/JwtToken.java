@@ -6,10 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 
-/**
- * Value object que representa um JWT emitido pelo ms-auth.
- * Imutável, sem comportamento criptográfico – apenas metadados.
- */
+// Value object que representa um JWT emitido pelo ms-auth.
 public final class JwtToken {
 
     /** Valor serializado do JWT (header.payload.signature). */

@@ -13,19 +13,13 @@ import org.springframework.context.annotation.Configuration;
 @ToString
 public class IngestionProperties {
 
-    /**
-     * Número máximo de erros tolerados por job antes de marcá-lo como FAILED.
-     */
+    // Número máximo de erros tolerados por job antes de marcá-lo como FAILED.
     private int maxErrorsPerJob = 500;
 
-    /**
-     * Lote de flush de RawTransactions por vez (para reduzir pressão no banco).
-     */
+    // Lote de flush de RawTransactions por vez (para reduzir pressão no banco).
     private int batchSize = 500;
 
-    /**
-     * Quantidade máxima de jobs em estado PENDING a serem reprocessados numa chamada de retry.
-     */
+    // Quantidade máxima de jobs em estado PENDING a serem reprocessados numa chamada de retry.
     private int maxJobsPerRetry = 10;
 
 }

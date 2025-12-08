@@ -13,12 +13,13 @@ import java.io.StringReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Currency;
 import java.util.List;
 
 @Slf4j
 @Component
 public class ApacheCommonsCsvParserAdapter implements ParseCsvPort {
+
+    private static final String DEFAULT_CURRENCY = "BRL";
 
     @Override
     public List<RawTransaction> parse(ImportJob job, String csvContent) {
@@ -26,41 +27,45 @@ public class ApacheCommonsCsvParserAdapter implements ParseCsvPort {
 
         List<RawTransaction> result = new ArrayList<>();
 
-        // Aqui você usaria Apache Commons CSV; para manter o exemplo independente, vou parsear de forma simples
-        // Esperando formato: date;description;amount;currency
+        // Formato esperado (simples): date;description;amount;currency
         try (StringReader reader = new StringReader(csvContent)) {
             String[] lines = csvContent.split("\\R");
             int lineNo = 0;
+
             for (String line : lines) {
                 lineNo++;
+
+                // pula header
                 if (lineNo == 1 && line.toLowerCase().contains("date")) {
-                    // header
                     continue;
                 }
                 if (line.isBlank()) {
                     continue;
                 }
+
                 String[] parts = line.split(";");
                 if (parts.length < 3) {
                     log.warn("[ApacheCommonsCsvParserAdapter] - [parse] -> Linha inválida line={} content={}",
                             lineNo, line);
                     continue;
                 }
+
                 LocalDate date = LocalDate.parse(parts[0].trim());
                 String desc = parts[1].trim();
                 BigDecimal amount = new BigDecimal(parts[2].trim());
-                Currency currency = parts.length >= 4
-                        ? Currency.getInstance(parts[3].trim())
-                        : Currency.getInstance("BRL");
+                String currencyCode = parts.length >= 4
+                        ? parts[3].trim()
+                        : DEFAULT_CURRENCY;
 
                 RawTransaction tx = RawTransaction.create(
                         job.id(),
                         null,
                         desc,
                         new TransactionDate(date),
-                        new Money(amount, currency),
+                        new Money(amount, currencyCode),
                         TransactionSourceType.FILE_CSV
                 );
+
                 result.add(tx);
             }
         } catch (Exception e) {
@@ -72,5 +77,4 @@ public class ApacheCommonsCsvParserAdapter implements ParseCsvPort {
         log.info("[ApacheCommonsCsvParserAdapter] - [parse] -> CSV parseado com sucesso totalTx={}", result.size());
         return result;
     }
-
 }

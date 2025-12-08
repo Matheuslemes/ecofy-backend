@@ -18,7 +18,7 @@ final class PersistenceMapper {
         throw new AssertionError("PersistenceMapper is a utility class and should not be instantiated");
     }
 
-    // ================== AuthUser ==================
+    // AuthUser
     static AuthUserEntity toEntity(AuthUser user) {
         Objects.requireNonNull(user, "user must not be null");
 
@@ -65,7 +65,7 @@ final class PersistenceMapper {
                 .collect(Collectors.toUnmodifiableSet());
 
         return new AuthUser(
-                new AuthUserId(e.getId()),              // UUID -> AuthUserId
+                new AuthUserId(e.getId()),
                 new EmailAddress(e.getEmail()),
                 new PasswordHash(e.getPasswordHash()),
                 e.getStatus(),
@@ -161,19 +161,19 @@ final class PersistenceMapper {
                 .build();
     }
 
-    // ================== RefreshToken ==================
+    // RefreshToken
     static RefreshToken toDomain(RefreshTokenEntity e) {
         Objects.requireNonNull(e, "RefreshTokenEntity must not be null");
 
         return new RefreshToken(
-                e.getId(),                              // UUID
+                e.getId(),
                 e.getTokenValue(),
-                new AuthUserId(e.getUserId()),          // UUID -> AuthUserId
+                new AuthUserId(e.getUserId()),
                 e.getClientId(),
                 e.getIssuedAt(),
                 e.getExpiresAt(),
                 e.isRevoked(),
-                e.getType()                             // TokenType (enum)
+                e.getType()
         );
     }
 
@@ -181,18 +181,18 @@ final class PersistenceMapper {
         Objects.requireNonNull(t, "refreshToken must not be null");
 
         return RefreshTokenEntity.builder()
-                .id(t.id())                             // UUID
+                .id(t.id())
                 .tokenValue(t.tokenValue())
-                .userId(t.userId().value())             // AuthUserId -> UUID
+                .userId(t.userId().value())
                 .clientId(t.clientId())
                 .issuedAt(t.issuedAt())
                 .expiresAt(t.expiresAt())
                 .revoked(t.isRevoked())
-                .type(t.type())                         // usa o enum vindo do domínio
+                .type(t.type())
                 .build();
     }
 
-    // ================== JWK ==================
+    // JWK
     static JwkKey toDomain(JwkKeyEntity e) {
         Objects.requireNonNull(e, "JwkKeyEntity must not be null");
 

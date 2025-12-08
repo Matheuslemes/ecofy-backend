@@ -57,8 +57,6 @@ public class AuthUserJpaAdapter implements SaveAuthUserPort, LoadAuthUserByEmail
         log.debug("[AuthUserJpaAdapter] - [save] -> Usuário persistido com sucesso id={} email={}",
                 saved.getId(), saved.getEmail());
 
-        // Se no futuro tiver coleções de roles/perms mapeadas com @ManyToMany/@OneToMany,
-        // o PersistenceMapper centraliza esse carregamento.
         return PersistenceMapper.toDomain(saved, saved.getRoles(), saved.getPermissions());
     }
 
@@ -109,8 +107,5 @@ public class AuthUserJpaAdapter implements SaveAuthUserPort, LoadAuthUserByEmail
         }
         entity.setUpdatedAt(now);
 
-        // TODO: mapear roles/perms quando a modelagem de relacionamento estiver fechada
-        // ex: entity.setRoles(roleMapper.toEntities(user.roles()));
-        //      entity.setPermissions(permissionMapper.toEntities(user.directPermissions()));
     }
 }

@@ -10,17 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Serviço responsável pela validação sintática e semântica de tokens JWT.
-
- * Este serviço usa apenas validação passiva (assinatura + expiração),
- * delegando a lógica avançada para JwtTokenProviderPort.
-
- * Pode ser futuramente estendido para:
- *  - introspecção ativa
- *  - blacklist / revogação baseada em jti
- *  - validações customizadas de claims
- */
+// Serviço responsável pela validação sintática e semântica de tokens JWT.
 @Slf4j
 @Service
 public class TokenValidationService implements ValidateTokenUseCase {

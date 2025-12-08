@@ -15,17 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Serviço responsável pelo fluxo completo de:
- *  1. Solicitação de reset de senha
- *  2. Consumo do token e definição da nova senha
-
- * Princípios aplicados:
- *  - Logs estruturados (sem expor tokens ou dados sensíveis)
- *  - Fail-fast em dependências nulas
- *  - Eventos de domínio publicados nos momentos adequados
- *  - Tokens armazenados apenas em store especializado
- */
+//Serviço responsável pelo fluxo completo de:
 @Slf4j
 @Service
 public class PasswordResetService implements RequestPasswordResetUseCase, ResetPasswordUseCase {

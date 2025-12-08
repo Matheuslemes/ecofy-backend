@@ -10,18 +10,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Implementação em memória da store de tokens de reset de senha.
- * ÚTIL PARA DEV / TESTES. Em produção, substitua por Redis/JPA, etc.
- */
 @Slf4j
 @Component
 public class InMemoryPasswordResetTokenStoreAdapter implements PasswordResetTokenStorePort {
 
-    /**
-     * Estrutura simples de armazenameto:
-     * token -> entry(user, createdAt)
-     */
     private final Map<String, Entry> tokens = new ConcurrentHashMap<>();
 
     @Override
@@ -61,8 +53,6 @@ public class InMemoryPasswordResetTokenStoreAdapter implements PasswordResetToke
 
         return Optional.of(entry.user);
     }
-
-    // Tipos auxiliares
 
     private record Entry(AuthUser user, Instant createdAt) { }
 

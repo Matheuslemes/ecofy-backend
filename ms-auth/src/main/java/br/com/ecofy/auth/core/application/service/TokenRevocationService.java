@@ -9,14 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
-/**
- * Serviço responsável por revogar tokens emitidos pelo MS Auth.
-
- * Atualmente:
- *  - Revoga refresh tokens (persistidos em store especializado)
- *  - Pode ser estendido para suportar revogação de access tokens
- *    (lista de bloqueio, cache distribuído, Redis, etc).
- */
+// Serviço responsável por revogar tokens emitidos pelo MS Auth.
 @Slf4j
 @Service
 public class TokenRevocationService implements RevokeTokenUseCase {

@@ -11,28 +11,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Mapper responsável por converter {@link ClientApplication} (domínio)
- * em {@link ClientApplicationResponse} (DTO exposto na API REST).
- */
 final class ClientApplicationMapper {
 
-    private ClientApplicationMapper() {
-        // utility class
-    }
-
-    /**
-     * Converte um {@link ClientApplication} para {@link ClientApplicationResponse}.
-     *
-     * @param client agregado de domínio (não pode ser nulo)
-     * @return DTO pronto para ser retornado pela API
-     */
     static ClientApplicationResponse toResponse(ClientApplication client) {
         Objects.requireNonNull(client, "client must not be null");
 
         String id = client.id() != null
                 ? client.id().toString()
-                : UUID.randomUUID().toString(); // ou null, se preferir não gerar
+                : UUID.randomUUID().toString();
 
         Set<GrantType> grants = safeGrants(client.grantTypes());
         Set<String> redirectUris = safeStrings(client.redirectUris());
@@ -53,10 +39,6 @@ final class ClientApplicationMapper {
         );
     }
 
-    /**
-     * Converte uma lista de {@link ClientApplication} para lista imutável
-     * de {@link ClientApplicationResponse}.
-     */
     static List<ClientApplicationResponse> toResponseList(List<ClientApplication> clients) {
         if (clients == null || clients.isEmpty()) {
             return List.of();
@@ -68,8 +50,6 @@ final class ClientApplicationMapper {
                         .toList()
         );
     }
-
-    // helpers
 
     private static Set<String> safeStrings(Set<String> values) {
         if (values == null || values.isEmpty()) {

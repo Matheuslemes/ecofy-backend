@@ -10,11 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
-/**
- * Serviço responsável por retornar o usuário autenticado atual.
- * Esta classe funciona como um "façade" de domínio para o adapter de segurança,
- * mantendo o domínio independente de Spring Security.
- */
+// Serviço responsável por retornar o usuário autenticado atual.
 @Slf4j
 @Service
 public class CurrentUserProfileService implements GetCurrentUserProfileUseCase {

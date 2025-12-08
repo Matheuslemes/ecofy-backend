@@ -70,10 +70,6 @@ public class JwksController {
         return 0;
     }
 
-    /**
-     * JWKS pode (e deve) ser cacheado pelos clientes por um tempo curto.
-     * Aqui usamos cache público de 5 minutos, sem no-store.
-     */
     private HttpHeaders jwksCacheHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setCacheControl(

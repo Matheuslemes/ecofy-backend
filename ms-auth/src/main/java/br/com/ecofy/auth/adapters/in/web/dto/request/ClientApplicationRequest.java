@@ -17,7 +17,6 @@ public record ClientApplicationRequest(
 
         Set<GrantType> grantTypes,
 
-
         Set<String> redirectUris,
 
         Set<String> scopes,
