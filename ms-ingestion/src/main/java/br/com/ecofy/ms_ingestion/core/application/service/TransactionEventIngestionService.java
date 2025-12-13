@@ -5,11 +5,13 @@ import br.com.ecofy.ms_ingestion.core.port.in.IngestTransactionEventUseCase;
 import br.com.ecofy.ms_ingestion.core.port.out.PublishTransactionForCategorizationPort;
 import br.com.ecofy.ms_ingestion.core.port.out.SaveRawTransactionPort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
 
 @Slf4j
+@Service
 public class TransactionEventIngestionService implements IngestTransactionEventUseCase {
 
     private final SaveRawTransactionPort saveRawTransactionPort;

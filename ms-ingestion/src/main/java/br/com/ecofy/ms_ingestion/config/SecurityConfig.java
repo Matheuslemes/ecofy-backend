@@ -14,11 +14,9 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
-            // Actuator básicos
             "/actuator/health",
             "/actuator/info",
 
-            // OpenAPI / Swagger
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"
@@ -34,27 +32,25 @@ public class SecurityConfig {
         log.info("[SecurityConfig] - [securityFilterChain] -> Configurando HTTP security para ms-ingestion");
 
         http
-                // ms-ingestion é protegido atrás do Gateway, não precisa de CSRF para APIs stateless
                 .csrf(csrf -> csrf.disable())
-
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints públicos
+                        // Públicos
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
 
-                        // Endpoints de ingestão exigem JWT válido (emitido pelo ms-auth)
-                        .requestMatchers(INGESTION_API_ENDPOINTS).authenticated()
+                        // LOCAL DEV MODE (sem token) — DESCOMENTE para testes locais
+                         .requestMatchers(INGESTION_API_ENDPOINTS).permitAll()
 
-                        // Qualquer outro endpoint também exige autenticação
+                        // PROD MODE (com token) — DEIXE ATIVO para exigir JWT
+//                        .requestMatchers(INGESTION_API_ENDPOINTS).authenticated()
+
                         .anyRequest().authenticated()
                 )
 
-                // Configura ms-ingestion como OAuth2 Resource Server (Bearer JWT)
-                // A configuração de issuer-uri / jwk-set-uri fica no application.yml
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(Customizer.withDefaults())
-                )
 
-                // Cabeçalhos de segurança básicos
+                // PROD MODE (com token) — DEIXE ATIVO para exigir JWT
+                // (em local dev mode, pode comentar este bloco inteiro)
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
+
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp
                                 .policyDirectives("default-src 'self'"))
@@ -63,4 +59,5 @@ public class SecurityConfig {
 
         return http.build();
     }
+
 }

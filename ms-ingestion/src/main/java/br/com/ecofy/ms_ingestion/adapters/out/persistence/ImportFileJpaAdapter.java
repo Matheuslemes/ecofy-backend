@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -41,4 +42,23 @@ public class ImportFileJpaAdapter implements SaveImportFilePort {
 
         return PersistenceMapper.toDomain(saved);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ImportFile getById(UUID id) {
+        Objects.requireNonNull(id, "id must not be null");
+
+        ImportFileEntity entity = repository.findById(id)
+                .orElseThrow(() -> new IllegalStateException(
+                        "ImportFile not found for id=" + id
+                ));
+
+        log.debug(
+                "[ImportFileJpaAdapter] - [getById] -> ImportFile carregado id={} storedPath={}",
+                entity.getId(), entity.getStoredFilename()
+        );
+
+        return PersistenceMapper.toDomain(entity);
+    }
+
 }

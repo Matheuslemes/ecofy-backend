@@ -26,4 +26,10 @@ public final class TransactionDate {
         return value.toString();
     }
 
+    public static TransactionDate of(LocalDate value) {
+        Objects.requireNonNull(value, "value must not be null");
+        return new TransactionDate(value);
+    }
+
+
 }

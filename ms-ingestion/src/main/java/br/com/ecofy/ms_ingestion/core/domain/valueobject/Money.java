@@ -10,7 +10,6 @@ public final class Money {
 
     public Money(BigDecimal amount, String currency) {
         this.amount = amount != null ? amount : BigDecimal.ZERO;
-        // default para BRL se vier nulo ou vazio
         this.currency = (currency == null || currency.isBlank())
                 ? "BRL"
                 : currency.toUpperCase();
@@ -42,5 +41,17 @@ public final class Money {
     @Override
     public String toString() {
         return currency + " " + amount;
+    }
+
+    // Factory padrão: usa default BRL (ou o default do construtor)
+    public static Money of(BigDecimal amount) {
+        Objects.requireNonNull(amount, "amount must not be null");
+        return new Money(amount, "BRL");
+    }
+
+    // Factory opcional: quando você tiver currency do arquivo (ex.: CURDEF)
+    public static Money of(BigDecimal amount, String currency) {
+        Objects.requireNonNull(amount, "amount must not be null");
+        return new Money(amount, currency);
     }
 }

@@ -8,7 +8,9 @@ import br.com.ecofy.ms_ingestion.core.domain.ImportError;
 import br.com.ecofy.ms_ingestion.core.domain.ImportFile;
 import br.com.ecofy.ms_ingestion.core.domain.ImportJob;
 import br.com.ecofy.ms_ingestion.core.domain.RawTransaction;
+import br.com.ecofy.ms_ingestion.core.domain.enums.ImportFileType;
 import br.com.ecofy.ms_ingestion.core.domain.enums.ImportJobStatus;
+import br.com.ecofy.ms_ingestion.core.domain.enums.TransactionSourceType;
 import br.com.ecofy.ms_ingestion.core.domain.valueobject.Money;
 import br.com.ecofy.ms_ingestion.core.domain.valueobject.TransactionDate;
 
@@ -21,10 +23,11 @@ final class PersistenceMapper {
     }
 
     // RAW TRANSACTION
-    static RawTransactionEntity toEntity(RawTransaction tx,
-                                         ImportJobEntity jobEntity,
-                                         ImportFileEntity fileEntity) {
-
+    static RawTransactionEntity toEntity(
+            RawTransaction tx,
+            ImportJobEntity jobEntity,
+            ImportFileEntity fileEntity
+    ) {
         Objects.requireNonNull(tx, "tx must not be null");
         Objects.requireNonNull(jobEntity, "jobEntity must not be null");
         Objects.requireNonNull(fileEntity, "fileEntity must not be null");
@@ -34,19 +37,16 @@ final class PersistenceMapper {
         e.setImportJob(jobEntity);
         e.setImportFile(fileEntity);
 
-        // domínio: TransactionDate date()
         e.setTransactionDate(tx.date().value());
-
         e.setDescription(tx.description());
 
-        // domínio: Money amount()
         e.setAmount(tx.amount().amount());
         e.setCurrency(tx.amount().currency());
 
         e.setSourceType(tx.sourceType());
         e.setExternalId(tx.externalId());
 
-        // domínio atual não expõe rawPayload → persiste como null por enquanto
+        // domínio ainda não expõe rawPayload
         e.setRawPayload(null);
 
         e.setCreatedAt(tx.createdAt());
@@ -79,20 +79,22 @@ final class PersistenceMapper {
         ImportFileEntity e = new ImportFileEntity();
         e.setId(file.id());
 
-        // domínio: originalFileName() / storedPath() / type()
         e.setOriginalFilename(file.originalFileName());
         e.setStoredFilename(file.storedPath());
         e.setFileType(file.type());
 
-        // domínio ainda não modela sourceType/contentType → mantém null
-        e.setSourceType(null);
+        // >>> CORREÇÃO PRINCIPAL (Opção 1)
+        e.setSourceType(resolveSourceType(file.type()));
+
         e.setContentType(null);
 
         e.setSizeBytes(file.sizeBytes());
         e.setUploadedAt(file.uploadedAt());
 
-        // domínio não tem createdAt -> usa o próprio uploadedAt como base
-        Instant created = file.uploadedAt() != null ? file.uploadedAt() : Instant.now();
+        Instant created = file.uploadedAt() != null
+                ? file.uploadedAt()
+                : Instant.now();
+
         e.setCreatedAt(created);
 
         return e;
@@ -101,7 +103,6 @@ final class PersistenceMapper {
     static ImportFile toDomain(ImportFileEntity e) {
         Objects.requireNonNull(e, "entity must not be null");
 
-        // mapeia só o que o domínio conhece hoje
         return new ImportFile(
                 e.getId(),
                 e.getOriginalFilename(),
@@ -110,6 +111,18 @@ final class PersistenceMapper {
                 e.getSizeBytes(),
                 e.getUploadedAt()
         );
+    }
+
+    private static TransactionSourceType resolveSourceType(ImportFileType type) {
+        if (type == null) {
+            // fallback defensivo
+            return TransactionSourceType.MANUAL_ENTRY;
+        }
+
+        return switch (type) {
+            case CSV -> TransactionSourceType.FILE_CSV;
+            case OFX -> TransactionSourceType.FILE_OFX;
+        };
     }
 
     // IMPORT JOB
@@ -134,7 +147,9 @@ final class PersistenceMapper {
 
     static ImportJob toDomain(ImportJobEntity e) {
         Objects.requireNonNull(e, "entity must not be null");
-        ImportFileEntity file = Objects.requireNonNull(e.getImportFile(), "importFile must not be null");
+        ImportFileEntity file = Objects.requireNonNull(
+                e.getImportFile(), "importFile must not be null"
+        );
 
         ImportJobStatus status = e.getStatus();
 
@@ -162,11 +177,8 @@ final class PersistenceMapper {
         e.setId(error.id());
         e.setImportJob(jobEntity);
         e.setLineNumber(error.lineNumber());
-
-        // domínio: rawContent() / errorMessage()
         e.setRawLine(error.rawContent());
         e.setMessage(error.errorMessage());
-
         e.setErrorType(error.errorType());
         e.setCreatedAt(error.createdAt());
         return e;

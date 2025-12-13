@@ -5,6 +5,7 @@ import br.com.ecofy.ms_ingestion.core.domain.ImportJob;
 import br.com.ecofy.ms_ingestion.core.port.in.GetImportJobStatusUseCase;
 import br.com.ecofy.ms_ingestion.core.port.out.LoadImportJobPort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
@@ -12,6 +13,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
+@Service
 public class ImportJobQueryService implements GetImportJobStatusUseCase {
 
     private final LoadImportJobPort loadImportJobPort;

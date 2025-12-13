@@ -31,7 +31,7 @@ public class IngestionEventsKafkaAdapter implements PublishIngestionEventPort {
 
     @Override
     public void publish(ImportJobStatusChangedEvent event) {
-        String topic = topics.getTransactionImported(); // ou outro tópico específico
+        String topic = topics.getImportJobStatusChanged();
         log.info("[IngestionEventsKafkaAdapter] - [publish] -> ImportJobStatusChangedEvent jobId={} newStatus={} topic={}",
                 event.importJobId(), event.newStatus(), topic);
         kafkaTemplate.send(topic, event.importJobId().toString(), event);

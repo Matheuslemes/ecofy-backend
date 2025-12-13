@@ -21,8 +21,7 @@ public class ImportErrorEntity {
     @Column(name = "line_number")
     private Integer lineNumber;
 
-    @Lob
-    @Column(name = "raw_line")
+    @Column(name = "raw_line", columnDefinition = "text")
     private String rawLine;
 
     @Column(name = "message", length = 1000)

@@ -77,8 +77,13 @@ public class KafkaConfig {
     @Getter
     @Setter
     public static class IngestionTopics {
+
         private String transactionImported = "eco.ingestion.transaction.imported";
+
+        private String importJobStatusChanged = "eco.ingestion.import-job.status-changed";
+
         private String categorizationRequest = "eco.categorization.request";
     }
+
 
 }

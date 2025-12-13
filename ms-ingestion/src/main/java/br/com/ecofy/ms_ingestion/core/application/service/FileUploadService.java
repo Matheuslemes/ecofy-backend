@@ -7,10 +7,12 @@ import br.com.ecofy.ms_ingestion.core.port.in.UploadFileUseCase;
 import br.com.ecofy.ms_ingestion.core.port.out.SaveImportFilePort;
 import br.com.ecofy.ms_ingestion.core.port.out.StoreFilePort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
 @Slf4j
+@Service
 public class FileUploadService implements UploadFileUseCase {
 
     private final SaveImportFilePort saveImportFilePort;

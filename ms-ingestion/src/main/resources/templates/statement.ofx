@@ -1,0 +1,40 @@
+OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:USASCII
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEUID:NONE
+NEWFILEUID:NONE
+
+<OFX>
+  <BANKMSGSRSV1>
+    <STMTTRNRS>
+      <STMTRS>
+        <CURDEF>BRL
+        <BANKTRANLIST>
+          <DTSTART>20250101000000
+          <DTEND>20250131235959
+
+          <STMTTRN>
+            <TRNTYPE>DEBIT
+            <DTPOSTED>20250105120000
+            <TRNAMT>-235.90
+            <FITID>20250105001
+            <NAME>Supermercado Extra
+          </STMTTRN>
+
+          <STMTTRN>
+            <TRNTYPE>CREDIT
+            <DTPOSTED>20250107120000
+            <TRNAMT>4500.00
+            <FITID>20250107001
+            <NAME>Salário Janeiro
+          </STMTTRN>
+
+        </BANKTRANLIST>
+      </STMTRS>
+    </STMTTRNRS>
+  </BANKMSGSRSV1>
+</OFX>

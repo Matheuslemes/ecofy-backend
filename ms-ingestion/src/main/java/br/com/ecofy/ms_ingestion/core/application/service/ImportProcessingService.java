@@ -2,6 +2,7 @@ package br.com.ecofy.ms_ingestion.core.application.service;
 
 import br.com.ecofy.ms_ingestion.config.IngestionProperties;
 import br.com.ecofy.ms_ingestion.core.domain.ImportError;
+import br.com.ecofy.ms_ingestion.core.domain.ImportFile;
 import br.com.ecofy.ms_ingestion.core.domain.ImportJob;
 import br.com.ecofy.ms_ingestion.core.domain.RawTransaction;
 import br.com.ecofy.ms_ingestion.core.domain.enums.ImportJobStatus;
@@ -11,6 +12,7 @@ import br.com.ecofy.ms_ingestion.core.port.in.RetryFailedImportsUseCase;
 import br.com.ecofy.ms_ingestion.core.port.in.StartImportJobUseCase;
 import br.com.ecofy.ms_ingestion.core.port.out.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -19,6 +21,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
+@Service
 public class ImportProcessingService implements StartImportJobUseCase, RetryFailedImportsUseCase {
 
     private final SaveImportJobPort saveImportJobPort;
@@ -60,7 +63,6 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
         this.ingestionProperties = Objects.requireNonNull(ingestionProperties, "ingestionProperties must not be null");
     }
 
-    // INÍCIO DO JOB
     @Override
     public ImportJob start(StartImportJobCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -76,7 +78,6 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
         return job;
     }
 
-    // PROCESSAMENTO PRINCIPAL DO JOB
     private void processJob(ImportJob job) {
         Objects.requireNonNull(job, "job must not be null");
 
@@ -99,28 +100,30 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
         try {
             log.info("[ImportProcessingService] - [processJob] -> Processando job id={}", job.id());
 
-            // 1) Carrega o conteúdo do arquivo via storage
-            byte[] fileBytes = fileContentLoaderPort.load(String.valueOf(job.importFileId()));
+            UUID importFileId = job.importFileId();
+
+            ImportFile importFile = saveImportFilePort.getById(importFileId);
+
+            String storedPath = importFile.storedPath();
+            if (storedPath == null || storedPath.isBlank()) {
+                throw new IllegalStateException("ImportFile storedPath is null/blank for id=" + importFileId);
+            }
+
+            byte[] fileBytes = fileContentLoaderPort.load(storedPath);
             String fileContent = new String(fileBytes, StandardCharsets.UTF_8);
 
-            // 2) Tenta parsear como CSV; se falhar, tenta OFX
             List<RawTransaction> parsedTransactions;
-            List<ImportError> parsedErrors = new ArrayList<>(); // hook p/ validações futuras
+            List<ImportError> parsedErrors = new ArrayList<>();
 
-            try {
-                parsedTransactions = parseCsvPort.parse(job, fileContent);
-            } catch (Exception csvEx) {
-                log.debug(
-                        "[ImportProcessingService] - [processJob] -> Falha ao parsear como CSV, tentando OFX jobId={} error={}",
-                        job.id(), csvEx.getMessage(), csvEx
-                );
-                parsedTransactions = parseOfxPort.parse(job, fileContent);
+            switch (importFile.type()) {
+                case CSV -> parsedTransactions = parseCsvPort.parse(job, fileContent);
+                case OFX -> parsedTransactions = parseOfxPort.parse(job, fileContent);
+                default -> throw new IllegalStateException("Unsupported ImportFileType=" + importFile.type() + " for id=" + importFileId);
             }
 
             allTransactions.addAll(parsedTransactions);
             allErrors.addAll(parsedErrors);
 
-            // 3) Persistir transações e publicar para categorização
             if (!allTransactions.isEmpty()) {
                 saveRawTransactionPort.saveAll(allTransactions);
 
@@ -134,12 +137,10 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
                 );
             }
 
-            // 4) Persistir erros, se existirem
             if (!allErrors.isEmpty()) {
                 saveImportErrorPort.saveAll(allErrors);
             }
 
-            // 5) Atualizar status final do job com base em erros
             if (allErrors.isEmpty()) {
                 job.markCompleted();
             } else if (allErrors.size() > ingestionProperties.getMaxErrorsPerJob()) {
@@ -179,7 +180,7 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
         }
     }
 
-    // RETRY DE JOBS COM FALHA / ERROS
+
     @Override
     public void retry(RetryFailedImportsCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -187,7 +188,6 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
         int maxJobs = command.maxJobs();
         log.info("[ImportProcessingService] - [retry] -> Disparo de retry solicitado maxJobs={}", maxJobs);
 
-        // Requer que LoadImportJobPort tenha o método loadJobsToRetry(int maxJobs)
         List<ImportJob> jobsToRetry = loadImportJobPort.loadJobsToRetry(maxJobs);
 
         if (jobsToRetry.isEmpty()) {

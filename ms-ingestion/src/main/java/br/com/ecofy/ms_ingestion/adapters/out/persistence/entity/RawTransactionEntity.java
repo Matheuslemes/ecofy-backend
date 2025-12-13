@@ -43,8 +43,7 @@ public class RawTransactionEntity {
     @Column(name = "external_id", length = 200)
     private String externalId;
 
-    @Lob
-    @Column(name = "raw_payload")
+    @Column(name = "raw_payload", columnDefinition = "text")
     private String rawPayload;
 
     @Column(name = "created_at", nullable = false, updatable = false)
