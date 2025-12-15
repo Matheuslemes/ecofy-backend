@@ -48,7 +48,7 @@ BEGIN
     END IF;
 END$$;
 
--- TABELA: auth_users
+-- TABELA: auth_users  (AuthUserEntity)
 CREATE TABLE IF NOT EXISTS auth_users (
     id                    UUID PRIMARY KEY,
     email                 VARCHAR(180) NOT NULL UNIQUE,
@@ -70,22 +70,21 @@ CREATE INDEX IF NOT EXISTS idx_auth_users_email
 CREATE INDEX IF NOT EXISTS idx_auth_users_status
     ON auth_users (status);
 
--- TABELA: auth_roles
+-- TABELA: auth_roles (RoleEntity)
 CREATE TABLE IF NOT EXISTS auth_roles (
     name        VARCHAR(64) PRIMARY KEY,
     description VARCHAR(255)
 );
 
--- TABELA: auth_permissions
+-- TABELA: auth_permissions (PermissionEntity)
 CREATE TABLE IF NOT EXISTS auth_permissions (
     name        VARCHAR(128) PRIMARY KEY,
     description VARCHAR(255),
-    domain      VARCHAR(64) NOT NULL DEFAULT '*'
+    domain      VARCHAR(64) DEFAULT '*'
 );
 
--- TABELAS DE RELACIONAMENTO
-
--- auth_users ↔ auth_roles
+-- RELACIONAMENTOS
+-- auth_users ↔ auth_roles (ManyToMany)
 CREATE TABLE IF NOT EXISTS auth_users_roles (
     user_id   UUID        NOT NULL,
     role_name VARCHAR(64) NOT NULL,
@@ -96,7 +95,7 @@ CREATE TABLE IF NOT EXISTS auth_users_roles (
         FOREIGN KEY (role_name) REFERENCES auth_roles (name) ON DELETE CASCADE
 );
 
--- auth_users ↔ auth_permissions
+-- auth_users ↔ auth_permissions (ManyToMany)
 CREATE TABLE IF NOT EXISTS auth_users_permissions (
     user_id         UUID         NOT NULL,
     permission_name VARCHAR(128) NOT NULL,
@@ -107,7 +106,7 @@ CREATE TABLE IF NOT EXISTS auth_users_permissions (
         FOREIGN KEY (permission_name) REFERENCES auth_permissions (name) ON DELETE CASCADE
 );
 
--- auth_roles ↔ auth_permissions
+-- auth_roles ↔ auth_permissions (ManyToMany)
 CREATE TABLE IF NOT EXISTS auth_roles_permissions (
     role_name       VARCHAR(64)  NOT NULL,
     permission_name VARCHAR(128) NOT NULL,
@@ -118,7 +117,7 @@ CREATE TABLE IF NOT EXISTS auth_roles_permissions (
         FOREIGN KEY (permission_name) REFERENCES auth_permissions (name) ON DELETE CASCADE
 );
 
--- TABELA: auth_client_applications
+-- TABELA: auth_client_applications (ClientApplicationEntity)
 CREATE TABLE IF NOT EXISTS auth_client_applications (
     id                 VARCHAR(36) PRIMARY KEY,
     client_id          VARCHAR(100) NOT NULL UNIQUE,
@@ -134,9 +133,7 @@ CREATE TABLE IF NOT EXISTS auth_client_applications (
 CREATE INDEX IF NOT EXISTS idx_auth_client_applications_active
     ON auth_client_applications (active);
 
--- Element collections de ClientApplicationEntity
-
--- grantTypes
+-- ElementCollection: grantTypes (auth_client_grants)
 CREATE TABLE IF NOT EXISTS auth_client_grants (
     client_id  VARCHAR(100) NOT NULL,
     grant_type grant_type   NOT NULL,
@@ -145,7 +142,7 @@ CREATE TABLE IF NOT EXISTS auth_client_grants (
         FOREIGN KEY (client_id) REFERENCES auth_client_applications (client_id) ON DELETE CASCADE
 );
 
--- redirectUris
+-- ElementCollection: redirectUris (auth_client_redirect_uris)
 CREATE TABLE IF NOT EXISTS auth_client_redirect_uris (
     client_id    VARCHAR(100) NOT NULL,
     redirect_uri VARCHAR(512) NOT NULL,
@@ -154,7 +151,7 @@ CREATE TABLE IF NOT EXISTS auth_client_redirect_uris (
         FOREIGN KEY (client_id) REFERENCES auth_client_applications (client_id) ON DELETE CASCADE
 );
 
--- scopes
+-- ElementCollection: scopes (auth_client_scopes)
 CREATE TABLE IF NOT EXISTS auth_client_scopes (
     client_id VARCHAR(100) NOT NULL,
     scope     VARCHAR(64)  NOT NULL,
@@ -163,16 +160,22 @@ CREATE TABLE IF NOT EXISTS auth_client_scopes (
         FOREIGN KEY (client_id) REFERENCES auth_client_applications (client_id) ON DELETE CASCADE
 );
 
--- TABELA: auth_refresh_tokens
+-- TABELA: auth_refresh_tokens (RefreshTokenEntity)
 CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
-    id          VARCHAR(36) PRIMARY KEY,
-    token_value VARCHAR(512) NOT NULL UNIQUE,
+    id          UUID PRIMARY KEY,
+    token_value VARCHAR(2048) NOT NULL UNIQUE,
     user_id     UUID         NOT NULL,
     client_id   VARCHAR(100) NOT NULL,
     issued_at   TIMESTAMPTZ  NOT NULL,
     expires_at  TIMESTAMPTZ  NOT NULL,
     revoked     BOOLEAN      NOT NULL DEFAULT FALSE,
-    type        token_type   NOT NULL
+    type        token_type   NOT NULL,
+
+    CONSTRAINT fk_auth_refresh_tokens_user
+        FOREIGN KEY (user_id) REFERENCES auth_users (id) ON DELETE CASCADE,
+
+    CONSTRAINT fk_auth_refresh_tokens_client
+        FOREIGN KEY (client_id) REFERENCES auth_client_applications (client_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_user
@@ -184,14 +187,14 @@ CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_expires_at
 CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_active
     ON auth_refresh_tokens (revoked, expires_at);
 
--- TABELA: auth_jwk_keys
+-- TABELA: auth_jwk_keys (JwkKeyEntity)
 CREATE TABLE IF NOT EXISTS auth_jwk_keys (
     key_id         VARCHAR(64) PRIMARY KEY,
-    public_key_pem TEXT         NOT NULL,
-    algorithm      VARCHAR(16)  NOT NULL,
-    "use"          VARCHAR(8)   NOT NULL DEFAULT 'sig',
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    active         BOOLEAN      NOT NULL DEFAULT TRUE
+    public_key_pem TEXT        NOT NULL,
+    algorithm      VARCHAR(16) NOT NULL,
+    "use"          VARCHAR(8)  NOT NULL,
+    active         BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_auth_jwk_keys_active

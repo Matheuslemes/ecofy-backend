@@ -1,14 +1,18 @@
--- PERMISSIONS & ROLES BÁSICOS
+-- =========================
+-- 002__auth_seed.sql
+-- =========================
 
+-- PERMISSIONS
 INSERT INTO auth_permissions (name, description, domain)
 VALUES
-    ('auth:user:read',   'Permite leitura de usuários de autenticação',       'auth'),
-    ('auth:user:write',  'Permite criação/alteração de usuários de auth',     'auth'),
-    ('auth:user:admin',  'Permite operações administrativas de auth',         'auth'),
-    ('auth:client:read', 'Permite leitura de client applications',            'auth'),
-    ('auth:client:write','Permite criação/alteração de client applications',  'auth')
+    ('auth:user:read',    'Permite leitura de usuários de autenticação',      'auth'),
+    ('auth:user:write',   'Permite criação/alteração de usuários de auth',    'auth'),
+    ('auth:user:admin',   'Permite operações administrativas de auth',        'auth'),
+    ('auth:client:read',  'Permite leitura de client applications',           'auth'),
+    ('auth:client:write', 'Permite criação/alteração de client applications', 'auth')
 ON CONFLICT (name) DO NOTHING;
 
+-- ROLES
 INSERT INTO auth_roles (name, description)
 VALUES
     ('ROLE_ADMIN', 'Administrador da plataforma EcoFy'),
@@ -21,14 +25,12 @@ SELECT 'ROLE_ADMIN', p.name
 FROM auth_permissions p
 ON CONFLICT (role_name, permission_name) DO NOTHING;
 
--- ROLE_USER tem apenas leitura básica de si mesmo
+-- ROLE_USER tem apenas leitura básica
 INSERT INTO auth_roles_permissions (role_name, permission_name)
-VALUES
-    ('ROLE_USER', 'auth:user:read')
+VALUES ('ROLE_USER', 'auth:user:read')
 ON CONFLICT (role_name, permission_name) DO NOTHING;
 
--- CLIENT APPLICATION PARA ECOFY DASHBOARD (DEV)
-
+-- CLIENT APPLICATION (DEV)
 INSERT INTO auth_client_applications (
     id,
     client_id,
@@ -62,8 +64,7 @@ ON CONFLICT (client_id, grant_type) DO NOTHING;
 
 -- Redirect URIs
 INSERT INTO auth_client_redirect_uris (client_id, redirect_uri)
-VALUES
-    ('eco_dashboard_local', 'http://localhost:3000/auth/callback')
+VALUES ('eco_dashboard_local', 'http://localhost:3000/auth/callback')
 ON CONFLICT (client_id, redirect_uri) DO NOTHING;
 
 -- Scopes
@@ -74,7 +75,7 @@ VALUES
     ('eco_dashboard_local', 'email')
 ON CONFLICT (client_id, scope) DO NOTHING;
 
--- JWK "placeholder" (chave pública)
+-- JWK placeholder
 INSERT INTO auth_jwk_keys (key_id, public_key_pem, algorithm, "use", created_at, active)
 VALUES (
     'ecofy-auth-key-1',

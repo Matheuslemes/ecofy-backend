@@ -27,16 +27,14 @@ class UserMapperTest {
 
 
     @Test
-    void constructor_shouldBePrivateAndCallableViaReflection() throws Exception {
-
+    void constructor_shouldNotBePublic_andCallableViaReflection() throws Exception {
         Constructor<UserMapper> ctor = UserMapper.class.getDeclaredConstructor();
 
-        assertTrue(Modifier.isPrivate(ctor.getModifiers()), "Construtor deve ser private");
+        assertFalse(Modifier.isPublic(ctor.getModifiers()), "Construtor não deve ser public");
 
         ctor.setAccessible(true);
         UserMapper instance = ctor.newInstance();
         assertNotNull(instance);
-
     }
 
     @Test

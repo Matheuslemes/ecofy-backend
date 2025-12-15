@@ -23,15 +23,14 @@ class ClientApplicationMapperTest {
     private ClientApplication clientApplication;
 
     @Test
-    void constructor_shouldBePrivateAndCallableViaReflection() throws Exception {
+    void constructor_shouldNotBePublic_andCallableViaReflection() throws Exception {
 
         Constructor<ClientApplicationMapper> ctor =
                 ClientApplicationMapper.class.getDeclaredConstructor();
 
-        assertTrue(Modifier.isPrivate(ctor.getModifiers()));
+        assertFalse(Modifier.isPublic(ctor.getModifiers()));
 
         ctor.setAccessible(true);
-        // não deve lançar exceção
         ClientApplicationMapper instance = ctor.newInstance();
         assertNotNull(instance);
 

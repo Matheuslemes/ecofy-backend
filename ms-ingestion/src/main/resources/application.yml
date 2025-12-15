@@ -29,7 +29,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/ecofy_ingestion}
     username: ${DB_USER:ecofy_ingestion}
-    password: ${DB_PASS:change_me}
+    password: ${DB_PASS:ecofy_ingestion}
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: MsIngestionHikariPool
