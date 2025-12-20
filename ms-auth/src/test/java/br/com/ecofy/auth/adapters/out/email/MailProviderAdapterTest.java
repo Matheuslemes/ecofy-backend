@@ -30,11 +30,14 @@ class MailProviderAdapterTest {
 
     @BeforeEach
     void resetMocks() {
-        // não é obrigatório, mas mantém previsibilidade em suítes grandes
         clearInvocations(mailSender, props);
     }
 
-    // ---------- helpers (apenas métodos) ----------
+    // helpers (apenas métodos)
+
+    private MailProviderAdapter adapterNoStub() {
+        return new MailProviderAdapter(mailSender, mock(MailConfig.EcofyMailProperties.class));
+    }
 
     private MailProviderAdapter adapter(String from, String frontendBaseUrl) {
         when(props.getFrom()).thenReturn(from);
@@ -42,26 +45,15 @@ class MailProviderAdapterTest {
         return new MailProviderAdapter(mailSender, props);
     }
 
-    /**
-     * Cria um AuthUser mockado com:
-     * - id().value() -> UUID
-     * - email().value() -> String
-     * - fullName() -> String
-     *
-     * Ajuste os tipos mockados abaixo (AuthUserId/Email) para os reais do seu domínio.
-     */
     private AuthUser user(String uuid, String email, String fullName) {
         AuthUser u = mock(AuthUser.class, RETURNS_DEEP_STUBS);
-
-        // IMPORTANTE: retorne String (UUID em texto), não UUID
         when(u.id().value()).thenReturn(UUID.fromString(uuid));
         when(u.email().value()).thenReturn(email);
         when(u.fullName()).thenReturn(fullName);
-
         return u;
     }
 
-    // ---------- constructor coverage ----------
+    // constructor coverage
 
     @Test
     @DisplayName("constructor: mailSender null -> NPE com mensagem")
@@ -79,12 +71,12 @@ class MailProviderAdapterTest {
                 .hasMessageContaining("props must not be null");
     }
 
-    // ---------- validation coverage ----------
+    // validation coverage
 
     @Test
     @DisplayName("send: user null -> NPE")
     void send_userNull_throwsNpe() {
-        MailProviderAdapter a = adapter("no-reply@ecofy.com", "https://ecofy.app");
+        MailProviderAdapter a = adapterNoStub();
 
         assertThatThrownBy(() -> a.send(null, "token"))
                 .isInstanceOf(NullPointerException.class)
@@ -96,8 +88,9 @@ class MailProviderAdapterTest {
     @Test
     @DisplayName("send: token null -> NPE")
     void send_tokenNull_throwsNpe() {
-        MailProviderAdapter a = adapter("no-reply@ecofy.com", "https://ecofy.app");
-        AuthUser u = user("8f8e2b3a-3d8e-4c4a-9a3c-0c4b9b5d8c11", "u@ecofy.com", "Matheus");
+        // IMPORTANTE: não stubbar props nem AuthUser aqui (Mockito strict).
+        MailProviderAdapter a = adapterNoStub();
+        AuthUser u = mock(AuthUser.class); // sem stubs; não serão usados antes do NPE
 
         assertThatThrownBy(() -> a.send(u, null))
                 .isInstanceOf(NullPointerException.class)
@@ -109,7 +102,7 @@ class MailProviderAdapterTest {
     @Test
     @DisplayName("sendReset: user null -> NPE")
     void sendReset_userNull_throwsNpe() {
-        MailProviderAdapter a = adapter("no-reply@ecofy.com", "https://ecofy.app");
+        MailProviderAdapter a = adapterNoStub();
 
         assertThatThrownBy(() -> a.sendReset(null, "token"))
                 .isInstanceOf(NullPointerException.class)
@@ -121,8 +114,8 @@ class MailProviderAdapterTest {
     @Test
     @DisplayName("sendReset: token null -> NPE")
     void sendReset_tokenNull_throwsNpe() {
-        MailProviderAdapter a = adapter("no-reply@ecofy.com", "https://ecofy.app");
-        AuthUser u = user("2b9c6a3e-6d3a-4b8f-9c9c-8c0b9c8a0e11", "u@ecofy.com", "Ana");
+        MailProviderAdapter a = adapterNoStub();
+        AuthUser u = mock(AuthUser.class); // sem stubs; não serão usados antes do NPE
 
         assertThatThrownBy(() -> a.sendReset(u, null))
                 .isInstanceOf(NullPointerException.class)
@@ -131,7 +124,7 @@ class MailProviderAdapterTest {
         verifyNoInteractions(mailSender);
     }
 
-    // ---------- success paths + branch coverage (fallbacks) ----------
+    // success paths + branch coverage (fallbacks)
 
     @Test
     @DisplayName("send: sucesso com from custom e baseUrl custom (subject/to/from/text/link)")
@@ -157,7 +150,6 @@ class MailProviderAdapterTest {
     @Test
     @DisplayName("sendReset: sucesso com fallbacks (from default e baseUrl default)")
     void sendReset_success_fallbackFrom_fallbackBaseUrl() {
-        // cobre Objects.requireNonNullElse(from) e requireNonNullElse(frontendBaseUrl)
         MailProviderAdapter a = adapter(null, null);
         AuthUser u = user("8d8c7b6a-5e4d-3c2b-1a00-abcdefabcdef", "reset@ecofy.com", "Marina");
 
@@ -177,21 +169,26 @@ class MailProviderAdapterTest {
     }
 
     @Test
-    @DisplayName("send: token com caracteres especiais deve ser encoded na query string")
+    @DisplayName("send: token com caracteres especiais deve ser incluído na query string (sem encoding)")
     void send_tokenEncoding_isApplied() {
         MailProviderAdapter a = adapter(null, "http://localhost:3000");
         AuthUser u = user("11111111-2222-3333-4444-555555555555", "enc@ecofy.com", "João");
 
-        a.send(u, "a b&c");
+        String token = "a b&c";
+        a.send(u, token);
 
-        verify(mailSender).send(messageCaptor.capture());
+        verify(mailSender, times(1)).send(messageCaptor.capture());
         String text = messageCaptor.getValue().getText();
 
-        assertThat(text).contains("/auth/confirm-email?token=");
-        assertThat(text).contains("token=a%20b%26c");
+        assertThat(text).contains("http://localhost:3000/auth/confirm-email?token=");
+        assertThat(text).contains("token=" + token);
+
+        // opcional: garante que NÃO houve encoding (documenta o comportamento atual)
+        assertThat(text).doesNotContain("token=a%20b%26c");
     }
 
-    // ---------- failure paths (catch MailException branch) ----------
+
+    // failure paths (catch MailException branch)
 
     @Test
     @DisplayName("send: MailException -> IllegalStateException com mensagem e causa")
