@@ -1,6 +1,7 @@
 package br.com.ecofy.ms_ingestion.core.domain.valueobject;
 
 import java.math.BigDecimal;
+import java.util.Currency;
 import java.util.Objects;
 
 public final class Money {
@@ -12,7 +13,14 @@ public final class Money {
         this.amount = amount != null ? amount : BigDecimal.ZERO;
         this.currency = (currency == null || currency.isBlank())
                 ? "BRL"
-                : currency.toUpperCase();
+                : currency.trim().toUpperCase();
+    }
+
+    public Money(BigDecimal amount, Currency currency) {
+        this.amount = amount != null ? amount : BigDecimal.ZERO;
+        this.currency = (currency == null)
+                ? "BRL"
+                : currency.getCurrencyCode();
     }
 
     public BigDecimal amount() {
@@ -43,13 +51,11 @@ public final class Money {
         return currency + " " + amount;
     }
 
-    // Factory padrão: usa default BRL (ou o default do construtor)
     public static Money of(BigDecimal amount) {
         Objects.requireNonNull(amount, "amount must not be null");
         return new Money(amount, "BRL");
     }
 
-    // Factory opcional: quando você tiver currency do arquivo (ex.: CURDEF)
     public static Money of(BigDecimal amount, String currency) {
         Objects.requireNonNull(amount, "amount must not be null");
         return new Money(amount, currency);

@@ -1,5 +1,6 @@
 package br.com.ecofy.ms_categorization.config;
 
+import br.com.ecofy.ms_categorization.adapters.in.kafka.dto.CategorizationRequestMessage;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
@@ -16,29 +17,30 @@ import org.springframework.util.backoff.ExponentialBackOff;
 public class KafkaConsumerConfig {
 
     @Bean
-    public ConsumerFactory<String, Object> consumerFactory(KafkaProperties props) {
+    public ConsumerFactory<String, CategorizationRequestMessage> consumerFactory(KafkaProperties props) {
         var cfg = props.buildConsumerProperties();
+
         cfg.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         cfg.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        cfg.put(JsonDeserializer.TRUSTED_PACKAGES, "br.com.ecofy.categorization.adapters.in.kafka.dto");
-        cfg.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
-        cfg.put(JsonDeserializer.VALUE_DEFAULT_TYPE,
-                "br.com.ecofy.categorization.adapters.in.kafka.dto.CategorizationRequestMessage");
-        return new DefaultKafkaConsumerFactory<>(cfg);
+
+        var valueDeserializer = new JsonDeserializer<>(CategorizationRequestMessage.class);
+        valueDeserializer.ignoreTypeHeaders(); // equivalente a USE_TYPE_INFO_HEADERS=false
+        valueDeserializer.addTrustedPackages("br.com.ecofy.ms_categorization.adapters.in.kafka.dto");
+
+        return new DefaultKafkaConsumerFactory<>(cfg, new StringDeserializer(), valueDeserializer);
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
-            ConsumerFactory<String, Object> consumerFactory
+    public ConcurrentKafkaListenerContainerFactory<String, CategorizationRequestMessage> kafkaListenerContainerFactory(
+            ConsumerFactory<String, CategorizationRequestMessage> consumerFactory
     ) {
-        var factory = new ConcurrentKafkaListenerContainerFactory<String, Object>();
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, CategorizationRequestMessage>();
         factory.setConsumerFactory(consumerFactory);
 
         var backoff = new ExponentialBackOff(500L, 2.0);
         backoff.setMaxInterval(10_000L);
-        var errorHandler = new DefaultErrorHandler((rec, ex) -> { }, backoff);
-        factory.setCommonErrorHandler(errorHandler);
 
+        factory.setCommonErrorHandler(new DefaultErrorHandler((rec, ex) -> { }, backoff));
         return factory;
     }
 }

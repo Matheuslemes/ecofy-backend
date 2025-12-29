@@ -56,7 +56,7 @@ public class EventMapper {
                 tx.getExternalId(),
                 tx.getTransactionDate(),
                 money.getAmount(),
-                currencyCode(money.getCurrency()),
+                money.getCurrency(),
                 categoryId,
                 mode,
                 occurredAt

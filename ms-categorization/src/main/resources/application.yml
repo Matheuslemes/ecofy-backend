@@ -68,18 +68,12 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
-      properties:
-        spring.json.trusted.packages: "br.com.ecofy.ms_categorization.adapters.in.kafka.dto"
-        spring.json.use.type.headers: false
 
     producer:
       acks: all
       retries: 3
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      properties:
-        enable.idempotence: true
-        spring.json.add.type.headers: false
 
   jackson:
     time-zone: UTC
@@ -94,7 +88,7 @@ spring:
         jwt:
           jwk-set-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
 
-# Propriedades de negócio do ms-categorization
+# Propriedades de negï¿½cio do ms-categorization
 ecofy:
   categorization:
     topics:
@@ -227,7 +221,7 @@ spring:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     properties:
       security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
-      # SASL/SSL via env se necessário:
+      # SASL/SSL via env se necessï¿½rio:
       # sasl.mechanism: PLAIN
       # sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG:}
 

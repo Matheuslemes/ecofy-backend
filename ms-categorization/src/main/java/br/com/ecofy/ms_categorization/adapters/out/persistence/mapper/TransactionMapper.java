@@ -37,7 +37,7 @@ public class TransactionMapper {
                 .merchantNormalized(d.getMerchant().getNormalized())
                 .transactionDate(d.getTransactionDate())
                 .amount(d.getMoney().getAmount())
-                .currency(d.getMoney().getCurrency())
+                .currency(d.getMoney().getCurrency().getCurrencyCode())
                 .sourceType(d.getSourceType())
                 .categoryId(d.getCategoryId())
                 .createdAt(d.getCreatedAt())

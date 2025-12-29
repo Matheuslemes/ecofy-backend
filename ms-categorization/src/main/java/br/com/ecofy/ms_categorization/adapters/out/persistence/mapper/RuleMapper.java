@@ -15,11 +15,14 @@ import java.util.Objects;
 @Component
 public class RuleMapper {
 
-    private static final TypeReference<List<RuleCondition>> CONDITIONS_TYPE =
-            new TypeReference<>() {};
+    private static final TypeReference<List<RuleCondition>> CONDITIONS_TYPE = new TypeReference<>() {};
 
     private final ObjectMapper objectMapper;
     private final Clock clock;
+
+    public RuleMapper() {
+        this(new ObjectMapper(), Clock.systemUTC());
+    }
 
     public RuleMapper(ObjectMapper objectMapper) {
         this(objectMapper, Clock.systemUTC());
@@ -61,28 +64,20 @@ public class RuleMapper {
     }
 
     private List<RuleCondition> readConditions(String json) {
-        if (json == null || json.isBlank()) {
-            return List.of();
-        }
+        if (json == null || json.isBlank()) return List.of();
         try {
             return objectMapper.readValue(json, CONDITIONS_TYPE);
         } catch (Exception ex) {
-            throw new IllegalStateException(
-                    "Failed to deserialize rule conditions JSON", ex
-            );
+            throw new IllegalStateException("Failed to deserialize rule conditions JSON", ex);
         }
     }
 
     private String writeConditions(List<RuleCondition> conditions) {
-        if (conditions == null || conditions.isEmpty()) {
-            return "[]";
-        }
+        if (conditions == null || conditions.isEmpty()) return "[]";
         try {
             return objectMapper.writeValueAsString(conditions);
         } catch (Exception ex) {
-            throw new IllegalStateException(
-                    "Failed to serialize rule conditions to JSON", ex
-            );
+            throw new IllegalStateException("Failed to serialize rule conditions to JSON", ex);
         }
     }
 

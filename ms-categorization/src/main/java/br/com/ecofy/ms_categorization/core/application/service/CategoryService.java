@@ -8,6 +8,7 @@ import br.com.ecofy.ms_categorization.core.port.out.LoadCategoriesPortOut;
 import br.com.ecofy.ms_categorization.core.port.out.SaveCategoryPortOut;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ public class CategoryService implements CreateCategoryUseCase, ListCategoriesUse
     private final LoadCategoriesPortOut loadCategoriesPort;
     private final Clock clock;
 
+    @Autowired
     public CategoryService(SaveCategoryPortOut saveCategoryPort, LoadCategoriesPortOut loadCategoriesPort) {
         this(saveCategoryPort, loadCategoriesPort, Clock.systemUTC());
     }

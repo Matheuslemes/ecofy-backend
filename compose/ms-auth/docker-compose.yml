@@ -1,0 +1,59 @@
+services:
+  ecofy-auth-db:
+    image: postgres:16-alpine
+    container_name: ecofy-auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ecofy_auth
+      POSTGRES_USER: ecofy_auth
+      POSTGRES_PASSWORD: ecofy_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - ecofy-auth-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecofy_auth -d ecofy_auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ecofy-auth-mail:
+    image: maildev/maildev
+    container_name: ecofy-auth-mail
+    restart: unless-stopped
+    ports:
+      - "1080:1080"  # UI Web para ver os e-mails
+      - "1025:1025"  # SMTP
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: "Mk3OEYBSD34fcwNTJENDM2Qk"
+    volumes:
+      - ./data:/var/lib/kafka/data
+
+
+volumes:
+  ecofy-auth-db-data:

@@ -12,6 +12,7 @@ import br.com.ecofy.ms_categorization.core.domain.enums.SuggestionStatus;
 import br.com.ecofy.ms_categorization.core.port.in.AutoCategorizeTransactionUseCase;
 import br.com.ecofy.ms_categorization.core.port.out.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,7 @@ public class AutoCategorizationService implements AutoCategorizeTransactionUseCa
     private final Clock clock;
     private final RuleEngine engine;
 
+    @Autowired
     public AutoCategorizationService(
             CategorizationProperties props,
             IdempotencyPortOut idempotencyPort,
