@@ -1,6 +1,7 @@
 package br.com.ecofy.ms_ingestion.core.application.service;
 
 import br.com.ecofy.ms_ingestion.config.StorageProperties;
+import br.com.ecofy.ms_ingestion.core.application.exception.*;
 import br.com.ecofy.ms_ingestion.core.domain.ImportFile;
 import br.com.ecofy.ms_ingestion.core.domain.enums.ImportFileType;
 import br.com.ecofy.ms_ingestion.core.port.in.UploadFileUseCase;
@@ -29,58 +30,74 @@ public class FileUploadService implements UploadFileUseCase {
 
     @Override
     public ImportFile upload(UploadFileCommand command) {
-        Objects.requireNonNull(command, "command must not be null");
+        if (command == null) {
+            throw new IngestionException(IngestionErrorCode.INVALID_COMMAND, "command must not be null");
+        }
 
         log.info(
                 "[FileUploadService] - [upload] -> Recebendo arquivo name={} sizeBytes={}",
                 command.originalFileName(), command.sizeBytes()
         );
 
-        if (command.sizeBytes() <= 0) {
-            throw new IllegalArgumentException("File size must be greater than zero");
+        long sizeBytes = command.sizeBytes();
+        if (sizeBytes <= 0) {
+            throw new InvalidFileSizeException(sizeBytes);
         }
 
-        if (command.sizeBytes() > storageProperties.getMaxFileSizeBytes()) {
-            throw new IllegalArgumentException("File too large");
+        long maxBytes = storageProperties.getMaxFileSizeBytes();
+        if (sizeBytes > maxBytes) {
+            throw new FileTooLargeException(sizeBytes, maxBytes);
         }
 
-        ImportFileType type = Objects.requireNonNull(
-                command.type(),
-                "ImportFileType (type) must not be null for uploaded file"
-        );
+        ImportFileType type = command.type();
+        if (type == null) {
+            throw new ImportFileTypeRequiredException();
+        }
 
-        // 1) Cria o agregado apenas com metadados (caminho ainda indefinido)
         ImportFile file = ImportFile.create(
                 command.originalFileName(),
                 "TO_BE_DEFINED",
                 type,
-                command.sizeBytes()
+                sizeBytes
         );
 
-        // 2) Persiste metadados iniciais para garantir ID
-        ImportFile persisted = saveImportFilePort.save(file);
+        try {
+            ImportFile persisted = saveImportFilePort.save(file);
 
-        // 3) Grava conteúdo físico usando o ID/camadas de storage
-        String storedPath = storeFilePort.store(persisted, command.content());
+            String storedPath;
+            try {
+                storedPath = storeFilePort.store(persisted, command.content());
+            } catch (Exception e) {
+                throw new StorageException("Failed to store file content", e);
+            }
 
-        // 4) Recria o agregado com o caminho definitivo
-        ImportFile withPath = new ImportFile(
-                persisted.id(),
-                persisted.originalFileName(),
-                storedPath,
-                persisted.type(),
-                persisted.sizeBytes(),
-                persisted.uploadedAt()
-        );
+            ImportFile withPath = new ImportFile(
+                    persisted.id(),
+                    persisted.originalFileName(),
+                    storedPath,
+                    persisted.type(),
+                    persisted.sizeBytes(),
+                    persisted.uploadedAt()
+            );
 
-        // 5) Atualiza o registro com o path final
-        ImportFile finalFile = saveImportFilePort.save(withPath);
+            ImportFile finalFile;
+            try {
+                finalFile = saveImportFilePort.save(withPath);
+            } catch (Exception e) {
+                throw new PersistenceException("Failed to persist ImportFile with final storedPath", e);
+            }
 
-        log.info(
-                "[FileUploadService] - [upload] -> Arquivo salvo com sucesso id={} path={}",
-                finalFile.id(), finalFile.storedPath()
-        );
+            log.info(
+                    "[FileUploadService] - [upload] -> Arquivo salvo com sucesso id={} path={}",
+                    finalFile.id(), finalFile.storedPath()
+            );
 
-        return finalFile;
+            return finalFile;
+
+        } catch (IngestionException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new PersistenceException("Unexpected error while uploading file", e);
+        }
     }
 }

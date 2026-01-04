@@ -1,6 +1,7 @@
 package br.com.ecofy.ms_ingestion.core.application.service;
 
 import br.com.ecofy.ms_ingestion.config.IngestionProperties;
+import br.com.ecofy.ms_ingestion.core.application.exception.*;
 import br.com.ecofy.ms_ingestion.core.domain.ImportError;
 import br.com.ecofy.ms_ingestion.core.domain.ImportFile;
 import br.com.ecofy.ms_ingestion.core.domain.ImportJob;
@@ -65,13 +66,24 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
 
     @Override
     public ImportJob start(StartImportJobCommand command) {
-        Objects.requireNonNull(command, "command must not be null");
+        if (command == null) {
+            throw new IngestionException(IngestionErrorCode.INVALID_COMMAND, "command must not be null");
+        }
+
         UUID importFileId = command.importFileId();
+        if (importFileId == null) {
+            throw new IngestionException(IngestionErrorCode.INVALID_COMMAND, "importFileId must not be null");
+        }
 
         log.info("[ImportProcessingService] - [start] -> Iniciando job para importFileId={}", importFileId);
 
-        ImportJob job = ImportJob.create(importFileId);
-        job = saveImportJobPort.save(job);
+        ImportJob job;
+        try {
+            job = ImportJob.create(importFileId);
+            job = saveImportJobPort.save(job);
+        } catch (Exception e) {
+            throw new PersistenceException("Failed to create/persist ImportJob", e);
+        }
 
         processJob(job);
 
@@ -82,17 +94,22 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
         Objects.requireNonNull(job, "job must not be null");
 
         ImportJobStatus previousStatus = job.status();
-        job.markRunning();
-        saveImportJobPort.save(job);
 
-        publishIngestionEventPort.publish(
-                new ImportJobStatusChangedEvent(
-                        job.id(),
-                        previousStatus,
-                        job.status(),
-                        job.updatedAt()
-                )
-        );
+        try {
+            job.markRunning();
+            saveImportJobPort.save(job);
+
+            publishIngestionEventPort.publish(
+                    new ImportJobStatusChangedEvent(
+                            job.id(),
+                            previousStatus,
+                            job.status(),
+                            job.updatedAt()
+                    )
+            );
+        } catch (Exception e) {
+            throw new PublishException("Failed to mark job RUNNING and publish status change", e);
+        }
 
         List<RawTransaction> allTransactions = new ArrayList<>();
         List<ImportError> allErrors = new ArrayList<>();
@@ -102,43 +119,69 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
 
             UUID importFileId = job.importFileId();
 
-            ImportFile importFile = saveImportFilePort.getById(importFileId);
+            ImportFile importFile;
+            try {
+                importFile = saveImportFilePort.getById(importFileId);
+            } catch (Exception e) {
+                throw new ImportFileNotFoundException(importFileId);
+            }
 
             String storedPath = importFile.storedPath();
             if (storedPath == null || storedPath.isBlank()) {
-                throw new IllegalStateException("ImportFile storedPath is null/blank for id=" + importFileId);
+                throw new ImportFileStoredPathMissingException(importFileId);
             }
 
-            byte[] fileBytes = fileContentLoaderPort.load(storedPath);
+            byte[] fileBytes;
+            try {
+                fileBytes = fileContentLoaderPort.load(storedPath);
+            } catch (Exception e) {
+                throw new StorageException("Failed to load stored file content", e);
+            }
+
             String fileContent = new String(fileBytes, StandardCharsets.UTF_8);
 
             List<RawTransaction> parsedTransactions;
-            List<ImportError> parsedErrors = new ArrayList<>();
-
-            switch (importFile.type()) {
-                case CSV -> parsedTransactions = parseCsvPort.parse(job, fileContent);
-                case OFX -> parsedTransactions = parseOfxPort.parse(job, fileContent);
-                default -> throw new IllegalStateException("Unsupported ImportFileType=" + importFile.type() + " for id=" + importFileId);
+            try {
+                switch (importFile.type()) {
+                    case CSV -> parsedTransactions = parseCsvPort.parse(job, fileContent);
+                    case OFX -> parsedTransactions = parseOfxPort.parse(job, fileContent);
+                    default -> throw new UnsupportedImportFileTypeException(String.valueOf(importFile.type()), importFileId);
+                }
+            } catch (IngestionException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ParseException("Failed to parse import file", e);
             }
 
             allTransactions.addAll(parsedTransactions);
-            allErrors.addAll(parsedErrors);
+            // parsedErrors (quando existir) -> allErrors.addAll(parsedErrors);
 
             if (!allTransactions.isEmpty()) {
-                saveRawTransactionPort.saveAll(allTransactions);
+                try {
+                    saveRawTransactionPort.saveAll(allTransactions);
+                } catch (Exception e) {
+                    throw new PersistenceException("Failed to persist raw transactions", e);
+                }
 
-                publishTransactionForCategorizationPort.publish(allTransactions);
-
-                publishIngestionEventPort.publish(
-                        new TransactionsImportedEvent(
-                                job.id(),
-                                allTransactions.stream().map(RawTransaction::id).toList()
-                        )
-                );
+                try {
+                    publishTransactionForCategorizationPort.publish(allTransactions);
+                    publishIngestionEventPort.publish(
+                            new TransactionsImportedEvent(
+                                    job.id(),
+                                    allTransactions.stream().map(RawTransaction::id).toList()
+                            )
+                    );
+                } catch (Exception e) {
+                    throw new PublishException("Failed to publish transactions/events", e);
+                }
             }
 
             if (!allErrors.isEmpty()) {
-                saveImportErrorPort.saveAll(allErrors);
+                try {
+                    saveImportErrorPort.saveAll(allErrors);
+                } catch (Exception e) {
+                    throw new PersistenceException("Failed to persist import errors", e);
+                }
             }
 
             if (allErrors.isEmpty()) {
@@ -160,12 +203,20 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
                     )
             );
 
+        } catch (IngestionException e) {
+            failJob(job, e);
         } catch (Exception e) {
-            log.error(
-                    "[ImportProcessingService] - [processJob] -> Erro ao processar job id={} error={}",
-                    job.id(), e.getMessage(), e
-            );
+            failJob(job, new IngestionException(IngestionErrorCode.PERSISTENCE_ERROR, "Unexpected error while processing job", e));
+        }
+    }
 
+    private void failJob(ImportJob job, RuntimeException cause) {
+        log.error(
+                "[ImportProcessingService] - [processJob] -> Erro ao processar job id={} error={}",
+                job.id(), cause.getMessage(), cause
+        );
+
+        try {
             job.markFailed();
             saveImportJobPort.save(job);
 
@@ -177,18 +228,29 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
                             job.updatedAt()
                     )
             );
+        } catch (Exception e) {
+            log.error(
+                    "[ImportProcessingService] - [failJob] -> Falha ao marcar job como FAILED/publicar evento id={} error={}",
+                    job.id(), e.getMessage(), e
+            );
         }
     }
 
-
     @Override
     public void retry(RetryFailedImportsCommand command) {
-        Objects.requireNonNull(command, "command must not be null");
+        if (command == null) {
+            throw new IngestionException(IngestionErrorCode.INVALID_COMMAND, "command must not be null");
+        }
 
         int maxJobs = command.maxJobs();
         log.info("[ImportProcessingService] - [retry] -> Disparo de retry solicitado maxJobs={}", maxJobs);
 
-        List<ImportJob> jobsToRetry = loadImportJobPort.loadJobsToRetry(maxJobs);
+        List<ImportJob> jobsToRetry;
+        try {
+            jobsToRetry = loadImportJobPort.loadJobsToRetry(maxJobs);
+        } catch (Exception e) {
+            throw new PersistenceException("Failed to load jobs eligible for retry", e);
+        }
 
         if (jobsToRetry.isEmpty()) {
             log.info("[ImportProcessingService] - [retry] -> Nenhum job elegível para retry encontrado");

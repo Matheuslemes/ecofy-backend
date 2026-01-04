@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: ms-budgeting
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ecofy_budgeting
+    username: postgres
+    password: postgres
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    default-schema: ecofy_budgeting
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: ${spring.application.name}
+      auto-offset-reset: earliest
+    producer:
+      properties:
+        enable.idempotence: true
+        acks: all
+
+ecofy:
+  budgeting:
+    topics:
+      categorized-transaction: eco.transaction.categorized
+      budget-alert: eco.budget.alert
+    idempotency:
+      ttl: PT24H
+    alerts:
+      warning-threshold-pct: 80
+      critical-threshold-pct: 95
+      publish-on-every-update: false
+    schedulers:
+      recalculation-enabled: true
+      cleanup-enabled: false
