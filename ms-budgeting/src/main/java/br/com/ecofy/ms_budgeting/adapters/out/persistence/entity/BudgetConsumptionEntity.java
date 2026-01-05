@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Getter
@@ -12,7 +13,13 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "budget_consumption")
+@Table(
+        name = "budget_consumption",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_budget_consumption_budget_refdate",
+                columnNames = {"budget_id", "reference_date"}
+        )
+)
 public class BudgetConsumptionEntity {
 
     @Id
@@ -20,6 +27,19 @@ public class BudgetConsumptionEntity {
 
     @Column(name = "budget_id", nullable = false)
     private UUID budgetId;
+
+    /**
+     * Data de referência usada para limpeza (ex.: period_end).
+     * Mantém o repository existente: deleteByReferenceDateLessThanEqual(...)
+     */
+    @Column(name = "reference_date", nullable = false)
+    private LocalDate referenceDate;
+
+    @Column(name = "period_start", nullable = false)
+    private LocalDate periodStart;
+
+    @Column(name = "period_end", nullable = false)
+    private LocalDate periodEnd;
 
     @Column(name = "consumed_cents", nullable = false)
     private long consumedCents;
@@ -30,10 +50,9 @@ public class BudgetConsumptionEntity {
     @Column(name = "source", nullable = false, length = 40)
     private String source;
 
-    @Column(name = "last_transaction_id")
-    private UUID lastTransactionId;
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
 }

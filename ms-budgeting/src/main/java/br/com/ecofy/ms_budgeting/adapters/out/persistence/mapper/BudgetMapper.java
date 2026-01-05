@@ -2,47 +2,107 @@ package br.com.ecofy.ms_budgeting.adapters.out.persistence.mapper;
 
 import br.com.ecofy.ms_budgeting.adapters.out.persistence.entity.BudgetEntity;
 import br.com.ecofy.ms_budgeting.core.domain.Budget;
-import br.com.ecofy.ms_budgeting.core.domain.valueobject.*;
+import br.com.ecofy.ms_budgeting.core.domain.valueobject.BudgetKey;
+import br.com.ecofy.ms_budgeting.core.domain.valueobject.CategoryId;
+import br.com.ecofy.ms_budgeting.core.domain.valueobject.Money;
+import br.com.ecofy.ms_budgeting.core.domain.valueobject.Period;
+import br.com.ecofy.ms_budgeting.core.domain.valueobject.UserId;
 
+import java.time.Instant;
 import java.util.Currency;
+import java.util.Objects;
+import java.util.UUID;
 
 public final class BudgetMapper {
 
     private BudgetMapper() {}
 
     public static Budget toDomain(BudgetEntity e) {
-        var key = new BudgetKey(
-                new UserId(e.getUserId()),
-                new CategoryId(e.getCategoryId()),
-                new Period(e.getPeriodStart(), e.getPeriodEnd())
+        if (e == null) return null;
+
+        UUID id = requireNonNull(e.getId(), "id");
+        UUID userId = requireNonNull(e.getUserId(), "userId");
+        UUID categoryId = requireNonNull(e.getCategoryId(), "categoryId");
+
+        var period = new Period(
+                requireNonNull(e.getPeriodStart(), "periodStart"),
+                requireNonNull(e.getPeriodEnd(), "periodEnd")
         );
 
+        var key = new BudgetKey(
+                new UserId(userId),
+                new CategoryId(categoryId),
+                period
+        );
+
+        Currency currency = parseCurrency(e.getCurrency());
+        var limit = new Money(requireNonNull(e.getLimitAmount(), "limitAmount"), currency);
+
+        Instant createdAt = e.getCreatedAt() != null ? e.getCreatedAt() : Instant.now();
+        Instant updatedAt = e.getUpdatedAt() != null ? e.getUpdatedAt() : createdAt;
+
+        // Opcional (recomendado): validar naturalKey persistida vs calculada
+        // Se você prefere tolerância, remova esse bloco.
+        String expectedNaturalKey = key.asNaturalKey();
+        if (e.getNaturalKey() == null || e.getNaturalKey().isBlank()) {
+            throw new IllegalStateException("naturalKey must not be blank");
+        }
+        if (!expectedNaturalKey.equals(e.getNaturalKey())) {
+            // Não quebra o fluxo se você não quiser; mas ajuda a detectar dados inconsistentes
+            throw new IllegalStateException(
+                    "naturalKey mismatch. expected=" + expectedNaturalKey + " persisted=" + e.getNaturalKey()
+            );
+        }
+
         return new Budget(
-                e.getId(),
+                id,
                 key,
-                e.getPeriodType(),
-                new Money(e.getLimitAmount(), Currency.getInstance(e.getCurrency())),
-                e.getStatus(),
-                e.getCreatedAt(),
-                e.getUpdatedAt()
+                requireNonNull(e.getPeriodType(), "periodType"),
+                limit,
+                requireNonNull(e.getStatus(), "status"),
+                createdAt,
+                updatedAt
         );
     }
 
     public static BudgetEntity toEntity(Budget b) {
+        Objects.requireNonNull(b, "budget must not be null");
+        Objects.requireNonNull(b.getKey(), "budget.key must not be null");
+        Objects.requireNonNull(b.getLimit(), "budget.limit must not be null");
+
+        String naturalKey = b.getKey().asNaturalKey();
+
+        Instant createdAt = b.getCreatedAt() != null ? b.getCreatedAt() : Instant.now();
+        Instant updatedAt = b.getUpdatedAt() != null ? b.getUpdatedAt() : createdAt;
+
         return BudgetEntity.builder()
-                .id(b.getId())
-                .userId(b.getKey().userId().value())
-                .categoryId(b.getKey().categoryId().value())
-                .periodType(b.getPeriodType())
-                .periodStart(b.getKey().period().start())
-                .periodEnd(b.getKey().period().end())
-                .limitAmount(b.getLimit().amount())
-                .currency(b.getLimit().currency().getCurrencyCode())
-                .status(b.getStatus())
-                .naturalKey(b.getKey().asNaturalKey())
-                .createdAt(b.getCreatedAt())
-                .updatedAt(b.getUpdatedAt())
+                .id(requireNonNull(b.getId(), "id"))
+                .userId(requireNonNull(b.getKey().userId(), "key.userId").value())
+                .categoryId(requireNonNull(b.getKey().categoryId(), "key.categoryId").value())
+                .periodType(requireNonNull(b.getPeriodType(), "periodType"))
+                .periodStart(requireNonNull(b.getKey().period(), "key.period").start())
+                .periodEnd(requireNonNull(b.getKey().period(), "key.period").end())
+                .limitAmount(requireNonNull(b.getLimit().amount(), "limit.amount"))
+                .currency(requireNonNull(b.getLimit().currency(), "limit.currency").getCurrencyCode())
+                .status(requireNonNull(b.getStatus(), "status"))
+                .naturalKey(naturalKey)
+                .createdAt(createdAt)
+                .updatedAt(updatedAt)
                 .build();
     }
 
+    private static Currency parseCurrency(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("currency must not be blank");
+        }
+        try {
+            return Currency.getInstance(code.trim());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid currency code: " + code, ex);
+        }
+    }
+
+    private static <T> T requireNonNull(T v, String field) {
+        return Objects.requireNonNull(v, field + " must not be null");
+    }
 }

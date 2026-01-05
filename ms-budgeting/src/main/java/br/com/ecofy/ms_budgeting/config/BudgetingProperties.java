@@ -7,12 +7,11 @@ import java.time.Duration;
 
 @ConfigurationProperties(prefix = "ecofy.budgeting")
 public record BudgetingProperties(
-
         Topics topics,
         Idempotency idempotency,
         Alerts alerts,
-        Schedulers schedulers
-
+        Schedulers schedulers,
+        Scheduling scheduling
 ) {
     public record Topics(
             String categorizedTransaction,
@@ -34,4 +33,9 @@ public record BudgetingProperties(
             boolean cleanupEnabled
     ) {}
 
+    public record Scheduling(
+            Integer cleanupRetentionDays,
+            String cleanupCron,
+            String recalculateCron
+    ) {}
 }

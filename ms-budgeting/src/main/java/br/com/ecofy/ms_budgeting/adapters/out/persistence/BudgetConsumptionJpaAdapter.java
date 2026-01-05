@@ -6,10 +6,16 @@ import br.com.ecofy.ms_budgeting.core.domain.BudgetConsumption;
 import br.com.ecofy.ms_budgeting.core.port.out.LoadBudgetConsumptionPort;
 import br.com.ecofy.ms_budgeting.core.port.out.SaveBudgetConsumptionPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class BudgetConsumptionJpaAdapter implements SaveBudgetConsumptionPort, LoadBudgetConsumptionPort {
@@ -17,16 +23,48 @@ public class BudgetConsumptionJpaAdapter implements SaveBudgetConsumptionPort, L
     private final BudgetConsumptionRepository repository;
 
     @Override
+    @Transactional
     public BudgetConsumption save(BudgetConsumption consumption) {
+        Objects.requireNonNull(consumption, "consumption must not be null");
+
+        log.debug(
+                "[BudgetConsumptionJpaAdapter] - [save] -> budgetId={} periodStart={} periodEnd={} source={}",
+                consumption.getBudgetId(), consumption.getPeriodStart(), consumption.getPeriodEnd(), consumption.getSource()
+        );
+
         var saved = repository.save(BudgetConsumptionMapper.toEntity(consumption));
         return BudgetConsumptionMapper.toDomain(saved);
     }
 
     @Override
-    public BudgetConsumption getCurrentConsumption(UUID budgetId) {
-        return repository.findTopByBudgetIdOrderByUpdatedAtDesc(budgetId)
-                .map(BudgetConsumptionMapper::toDomain)
-                .orElse(null);
+    @Transactional(readOnly = true)
+    public Optional<BudgetConsumption> findByBudgetAndPeriod(UUID budgetId, LocalDate start, LocalDate end) {
+        Objects.requireNonNull(budgetId, "budgetId must not be null");
+        Objects.requireNonNull(start, "start must not be null");
+        Objects.requireNonNull(end, "end must not be null");
+
+        if (start.isAfter(end)) {
+            throw new IllegalArgumentException("start must be <= end");
+        }
+
+        log.debug(
+                "[BudgetConsumptionJpaAdapter] - [findByBudgetAndPeriod] -> budgetId={} start={} end={}",
+                budgetId, start, end
+        );
+
+        return repository.findByBudgetIdAndPeriodStartAndPeriodEnd(budgetId, start, end)
+                .map(BudgetConsumptionMapper::toDomain);
     }
 
+    /**
+     * Helper interno (não faz parte do port).
+     * Use somente se existir caso de uso explícito para "último consumo atualizado".
+     */
+    @Transactional(readOnly = true)
+    public Optional<BudgetConsumption> findLatestByBudgetId(UUID budgetId) {
+        Objects.requireNonNull(budgetId, "budgetId must not be null");
+
+        return repository.findTopByBudgetIdOrderByUpdatedAtDesc(budgetId)
+                .map(BudgetConsumptionMapper::toDomain);
+    }
 }

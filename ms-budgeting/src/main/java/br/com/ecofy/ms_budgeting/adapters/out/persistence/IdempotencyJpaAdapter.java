@@ -1,37 +1,97 @@
 package br.com.ecofy.ms_budgeting.adapters.out.persistence;
 
-
 import br.com.ecofy.ms_budgeting.adapters.out.persistence.entity.IdempotencyKeyEntity;
 import br.com.ecofy.ms_budgeting.adapters.out.persistence.repository.IdempotencyRepository;
 import br.com.ecofy.ms_budgeting.core.port.out.IdempotencyPort;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 
+@Slf4j
 @Component
 public class IdempotencyJpaAdapter implements IdempotencyPort {
 
     private final IdempotencyRepository repo;
+    private final Clock clock;
 
-    public IdempotencyJpaAdapter(IdempotencyRepository repo) {
-        this.repo = repo;
+    public IdempotencyJpaAdapter(IdempotencyRepository repo, Clock clock) {
+        this.repo = Objects.requireNonNull(repo, "repo must not be null");
+        this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
     @Override
+    @Transactional
     public boolean tryAcquire(String key, Duration ttl, String scope) {
+        String k = requireNonBlank(key, "key");
+        String sc = requireNonBlank(scope, "scope");
+        Objects.requireNonNull(ttl, "ttl must not be null");
+        if (ttl.isZero() || ttl.isNegative()) {
+            throw new IllegalArgumentException("ttl must be positive");
+        }
+
+        Instant now = Instant.now(clock);
+
         try {
             repo.save(IdempotencyKeyEntity.builder()
-                    .key(key)
-                    .scope(scope)
-                    .createdAt(Instant.now())
-                    .expiresAt(Instant.now().plus(ttl))
+                    .key(k)
+                    .scope(sc)
+                    .createdAt(now)
+                    .expiresAt(now.plus(ttl))
                     .build());
+
+            log.debug("[IdempotencyJpaAdapter] - [tryAcquire] -> ACQUIRED key={} scope={} ttl={}s", k, sc, ttl.toSeconds());
             return true;
-        } catch (DataIntegrityViolationException e) {
-            return false;
+
+        } catch (DataIntegrityViolationException ex) {
+            // Tentativa de recuperação: se existir mas estiver expirada, remove e tenta de novo.
+            // Isso evita "chave fantasma" bloqueando operações depois do TTL.
+            boolean reacquired = tryReacquireIfExpired(k, sc, ttl, now);
+
+            if (!reacquired) {
+                log.debug("[IdempotencyJpaAdapter] - [tryAcquire] -> REJECTED key={} scope={}", k, sc);
+            }
+
+            return reacquired;
         }
     }
 
+    private boolean tryReacquireIfExpired(String key, String scope, Duration ttl, Instant now) {
+        return repo.findById(Long.valueOf(key))
+                .filter(existing -> existing.getExpiresAt() != null && existing.getExpiresAt().isBefore(now))
+                .map(existing -> {
+                    // Se escopo for relevante, você pode exigir match aqui:
+                    // if (!scope.equals(existing.getScope())) return false;
+
+                    repo.deleteById(Long.valueOf(key));
+
+                    try {
+                        repo.save(IdempotencyKeyEntity.builder()
+                                .key(key)
+                                .scope(scope)
+                                .createdAt(now)
+                                .expiresAt(now.plus(ttl))
+                                .build());
+
+                        log.debug("[IdempotencyJpaAdapter] - [tryAcquire] -> REACQUIRED key={} scope={}", key, scope);
+                        return true;
+
+                    } catch (DataIntegrityViolationException ignoreRace) {
+                        return false;
+                    }
+                })
+                .orElse(false);
+    }
+
+    private static String requireNonBlank(String v, String field) {
+        if (v == null || v.trim().isEmpty()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
+        return v.trim();
+    }
 }

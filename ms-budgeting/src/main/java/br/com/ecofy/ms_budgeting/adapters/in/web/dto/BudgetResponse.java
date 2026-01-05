@@ -1,5 +1,7 @@
 package br.com.ecofy.ms_budgeting.adapters.in.web.dto;
 
+import br.com.ecofy.ms_budgeting.core.application.result.BudgetResult;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;

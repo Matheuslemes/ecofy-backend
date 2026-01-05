@@ -1,0 +1,10 @@
+package br.com.ecofy.ms_budgeting.core.port.in;
+
+import br.com.ecofy.ms_budgeting.core.application.command.CleanupBudgetsCommand;
+import br.com.ecofy.ms_budgeting.core.application.result.CleanupBudgetsResult;
+
+public interface CleanupBudgetsUseCase {
+
+    CleanupBudgetsResult cleanup(CleanupBudgetsCommand command);
+
+}

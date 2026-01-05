@@ -4,19 +4,82 @@ import br.com.ecofy.ms_budgeting.core.application.command.ProcessTransactionComm
 import br.com.ecofy.ms_budgeting.core.port.in.ProcessTransactionForBudgetUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
+
+import java.util.Objects;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class BudgetEventIngestionService {
 
+    private static final String MDC_CORRELATION_ID = "correlationId";
+    private static final String MDC_EVENT_ID = "eventId";
+    private static final String MDC_RUN_ID = "runId";
+
     private final ProcessTransactionForBudgetUseCase useCase;
 
-    public void ingest(ProcessTransactionCommand cmd) {
-        log.debug("[BudgetEventIngestionService] - [ingest] -> txId={} userId={} categoryId={}",
-                cmd.transactionId(), cmd.userId(), cmd.categoryId());
-        useCase.process(cmd);
+    public void ingest(ProcessTransactionCommand cmd) throws Exception {
+        Objects.requireNonNull(cmd, "cmd must not be null");
+
+        // validações mínimas para evitar pipeline “engolindo” eventos inválidos
+        requireNonBlank(String.valueOf(cmd.transactionId()), "transactionId");
+        requireNonBlank(String.valueOf(cmd.userId()), "userId");
+        requireNonBlank(String.valueOf(cmd.categoryId()), "categoryId");
+
+        var md = cmd.metadata();
+        String runId = cmd.runId() != null ? cmd.runId().toString() : null;
+        String eventId = md != null ? md.eventId() : null;
+        String correlationId = md != null ? md.correlationId() : null;
+
+        try (var ignored = mdcScope(runId, eventId, correlationId)) {
+
+            log.info(
+                    "[BudgetEventIngestionService] - [ingest] -> START txId={} userId={} categoryId={} eventId={} correlationId={} topic={} partition={} offset={}",
+                    cmd.transactionId(),
+                    cmd.userId(),
+                    cmd.categoryId(),
+                    eventId,
+                    correlationId,
+                    md != null ? md.topic() : null,
+                    md != null ? md.partition() : null,
+                    md != null ? md.offset() : null
+            );
+
+            useCase.process(cmd);
+
+            log.info(
+                    "[BudgetEventIngestionService] - [ingest] -> DONE txId={} eventId={} correlationId={}",
+                    cmd.transactionId(), eventId, correlationId
+            );
+
+        } catch (Exception ex) {
+            log.error(
+                    "[BudgetEventIngestionService] - [ingest] -> FAIL txId={} eventId={} correlationId={} message={}",
+                    cmd.transactionId(), eventId, correlationId, ex.getMessage(), ex
+            );
+            throw ex;
+        }
+    }
+
+    private static AutoCloseable mdcScope(String runId, String eventId, String correlationId) {
+        if (runId != null) MDC.put(MDC_RUN_ID, runId);
+        if (eventId != null) MDC.put(MDC_EVENT_ID, eventId);
+        if (correlationId != null) MDC.put(MDC_CORRELATION_ID, correlationId);
+
+        return () -> {
+            MDC.remove(MDC_RUN_ID);
+            MDC.remove(MDC_EVENT_ID);
+            MDC.remove(MDC_CORRELATION_ID);
+        };
+    }
+
+    private static String requireNonBlank(String v, String field) {
+        if (v == null || v.trim().isEmpty()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
+        return v;
     }
 
 }

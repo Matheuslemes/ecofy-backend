@@ -23,12 +23,13 @@ import java.util.UUID;
 public class BudgetEntity {
 
     @Id
+    @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
-    @Column(name = "category_id", nullable = false)
+    @Column(name = "category_id", nullable = false, updatable = false)
     private UUID categoryId;
 
     @Enumerated(EnumType.STRING)
@@ -51,13 +52,36 @@ public class BudgetEntity {
     @Column(name = "status", nullable = false)
     private BudgetStatus status;
 
-    @Column(name = "natural_key", nullable = false, length = 200)
+    /**
+     * Preenchido quando o status vai para ARCHIVED.
+     * Usado pelo cleanup (ex.: remover arquivados antigos).
+     */
+    @Column(name = "archived_at")
+    private LocalDate archivedAt;
+
+    @Column(name = "natural_key", nullable = false, length = 200, updatable = false)
     private String naturalKey;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @PrePersist
+    void prePersist() {
+        if (id == null) id = UUID.randomUUID();
+        var now = Instant.now();
+        if (createdAt == null) createdAt = now;
+        updatedAt = now;
+
+        if (currency != null) currency = currency.trim().toUpperCase();
+        if (naturalKey != null) naturalKey = naturalKey.trim();
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        updatedAt = Instant.now();
+        if (currency != null) currency = currency.trim().toUpperCase();
+    }
 }

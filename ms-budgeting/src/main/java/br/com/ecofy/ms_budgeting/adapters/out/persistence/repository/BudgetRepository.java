@@ -1,6 +1,7 @@
 package br.com.ecofy.ms_budgeting.adapters.out.persistence.repository;
 
 import br.com.ecofy.ms_budgeting.adapters.out.persistence.entity.BudgetEntity;
+import br.com.ecofy.ms_budgeting.core.domain.enums.BudgetStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -15,4 +16,6 @@ public interface BudgetRepository extends JpaRepository<BudgetEntity, UUID> {
 
     boolean existsByNaturalKey(String naturalKey);
 
+    // Necessário para LoadBudgetsPort.findAllActive()
+    List<BudgetEntity> findByStatus(BudgetStatus status);
 }

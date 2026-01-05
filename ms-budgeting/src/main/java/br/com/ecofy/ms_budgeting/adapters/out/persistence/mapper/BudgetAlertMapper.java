@@ -3,9 +3,9 @@ package br.com.ecofy.ms_budgeting.adapters.out.persistence.mapper;
 import br.com.ecofy.ms_budgeting.adapters.out.persistence.entity.BudgetAlertEntity;
 import br.com.ecofy.ms_budgeting.core.domain.BudgetAlert;
 import br.com.ecofy.ms_budgeting.core.domain.enums.AlertSeverity;
-import br.com.ecofy.ms_budgeting.core.domain.valueobject.Money;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class BudgetAlertMapper {
@@ -13,17 +13,16 @@ public final class BudgetAlertMapper {
     private BudgetAlertMapper() {}
 
     public static BudgetAlertEntity toEntity(BudgetAlert d) {
+        Objects.requireNonNull(d, "domain must not be null");
+
         return BudgetAlertEntity.builder()
                 .id(d.getId())
                 .budgetId(d.getBudgetId())
-                .userId(d.getUserId())
-                .categoryId(d.getCategoryId())
+                .consumptionId(d.getConsumptionId())
                 .severity(d.getSeverity().name())
-                .message(d.getMessage())
-                .thresholdPercent(d.getThresholdPercent())
-                .consumedCents(d.getConsumed().cents())
-                .limitCents(d.getLimit().cents())
-                .currency(d.getLimit().currency())
+                .message(normalizeMessage(d.getMessage()))
+                .periodStart(d.getPeriodStart())
+                .periodEnd(d.getPeriodEnd())
                 .createdAt(d.getCreatedAt())
                 .build();
     }
@@ -31,44 +30,57 @@ public final class BudgetAlertMapper {
     public static BudgetAlert toDomain(BudgetAlertEntity e) {
         if (e == null) return null;
 
-        Money consumed = new Money(e.getConsumedCents(), e.getCurrency());
-        Money limit = new Money(e.getLimitCents(), e.getCurrency());
-
         return new BudgetAlert(
-                e.getId(),
-                e.getBudgetId(),
-                e.getUserId(),
-                e.getCategoryId(),
-                AlertSeverity.valueOf(e.getSeverity()),
-                e.getMessage(),
-                e.getThresholdPercent(),
-                consumed,
-                limit,
-                e.getCreatedAt() == null ? Instant.now() : e.getCreatedAt()
+                requireNonNull(e.getId(), "id"),
+                requireNonNull(e.getBudgetId(), "budgetId"),
+                requireNonNull(e.getConsumptionId(), "consumptionId"),
+                parseSeverity(e.getSeverity()),
+                normalizeMessage(e.getMessage()),
+                requireNonNull(e.getPeriodStart(), "periodStart"),
+                requireNonNull(e.getPeriodEnd(), "periodEnd"),
+                e.getCreatedAt() != null ? e.getCreatedAt() : Instant.now()
         );
     }
 
     public static BudgetAlert newAlert(
             UUID budgetId,
-            UUID userId,
-            UUID categoryId,
+            UUID consumptionId,
             AlertSeverity severity,
             String message,
-            Integer thresholdPercent,
-            Money consumed,
-            Money limit
+            java.time.LocalDate periodStart,
+            java.time.LocalDate periodEnd
     ) {
         return new BudgetAlert(
                 UUID.randomUUID(),
-                budgetId,
-                userId,
-                categoryId,
-                severity,
-                message,
-                thresholdPercent,
-                consumed,
-                limit,
+                requireNonNull(budgetId, "budgetId"),
+                requireNonNull(consumptionId, "consumptionId"),
+                requireNonNull(severity, "severity"),
+                normalizeMessage(message),
+                requireNonNull(periodStart, "periodStart"),
+                requireNonNull(periodEnd, "periodEnd"),
                 Instant.now()
         );
+    }
+
+    private static AlertSeverity parseSeverity(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("severity must not be blank");
+        }
+        try {
+            return AlertSeverity.valueOf(raw.trim());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Unknown severity: " + raw, ex);
+        }
+    }
+
+    private static String normalizeMessage(String msg) {
+        if (msg == null || msg.trim().isEmpty()) {
+            throw new IllegalArgumentException("message must not be blank");
+        }
+        return msg.trim();
+    }
+
+    private static <T> T requireNonNull(T v, String field) {
+        return Objects.requireNonNull(v, field + " must not be null");
     }
 }

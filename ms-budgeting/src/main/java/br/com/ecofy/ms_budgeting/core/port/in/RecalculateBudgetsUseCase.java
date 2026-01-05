@@ -4,6 +4,6 @@ import br.com.ecofy.ms_budgeting.core.application.command.RecalculateBudgetsComm
 
 public interface RecalculateBudgetsUseCase {
 
-    void recalculate(RecalculateBudgetsCommand cmd, String idempotencyKey);
+    void recalculate(RecalculateBudgetsCommand cmd);
 
 }
