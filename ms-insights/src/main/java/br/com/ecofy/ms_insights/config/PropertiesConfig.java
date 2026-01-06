@@ -1,0 +1,8 @@
+package br.com.ecofy.ms_insights.config;
+
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@EnableConfigurationProperties({InsightsProperties.class, ExternalClientsProperties.class})
+public class PropertiesConfig { }
