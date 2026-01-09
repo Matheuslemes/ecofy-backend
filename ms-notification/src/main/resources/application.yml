@@ -1,1 +1,120 @@
-spring.application.name=ms-notification
+# BASE / DEV (default)
+
+server:
+  port: 8086
+  servlet:
+    context-path: /
+  shutdown: graceful
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: ms-notification
+
+  main:
+    web-application-type: servlet
+    threads:
+      virtual:
+        enabled: true
+
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/ecofy_notification}
+      auto-index-creation: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    properties:
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:${spring.application.name}}
+      auto-offset-reset: earliest
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+ecofy:
+  notification:
+    topics:
+      budget-alert: ${NTF_TOPIC_BUDGET_ALERT:eco.budget.alert}
+      insight-created: ${NTF_TOPIC_INSIGHT_CREATED:eco.insight.created}
+      notification-sent: ${NTF_TOPIC_NOTIFICATION_SENT:eco.notification.sent}
+    idempotency:
+      enabled: ${NTF_IDEMPOTENCY_ENABLED:true}
+      ttl: ${NTF_IDEMPOTENCY_TTL:PT24H}
+    retry:
+      max-attempts: ${NTF_RETRY_MAX:3}
+      base-backoff: ${NTF_RETRY_BACKOFF:PT3S}
+      multiplier: ${NTF_RETRY_MULT:2.0}
+    clients:
+      user-profile:
+        enabled: ${NTF_USER_PROFILE_CLIENT_ENABLED:false}
+        base-url: ${NTF_USER_PROFILE_BASE_URL:http://localhost:8087}
+        connect-timeout-ms: ${NTF_USER_PROFILE_CONNECT_TIMEOUT_MS:800}
+        read-timeout-ms: ${NTF_USER_PROFILE_READ_TIMEOUT_MS:1500}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+
+logging:
+  level:
+    root: INFO
+    br.com.ecofy.notification: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  data:
+    mongodb:
+      uri: ${MONGO_URI_TEST:mongodb://localhost:27018/ecofy_notification_test}
+
+logging:
+  level:
+    root: WARN
+    br.com.ecofy.notification: INFO
+
+ecofy:
+  notification:
+    idempotency:
+      ttl: PT1M
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://mongo:27017/ecofy_notification}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWT_JWKS_URI:https://auth.ecofy.com/.well-known/jwks.json}
+
+logging:
+  level:
+    root: INFO
+    br.com.ecofy.notification: INFO

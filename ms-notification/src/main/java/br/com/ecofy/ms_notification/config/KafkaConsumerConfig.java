@@ -1,7 +1,7 @@
 package br.com.ecofy.ms_notification.config;
 
-import br.com.ecofy.notification.adapters.in.kafka.dto.BudgetAlertEventMessage;
-import br.com.ecofy.notification.adapters.in.kafka.dto.InsightCreatedEventMessage;
+import br.com.ecofy.ms_notification.adapters.in.kafka.dto.BudgetAlertEventMessage;
+import br.com.ecofy.ms_notification.adapters.in.kafka.dto.InsightCreatedEventMessage;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
