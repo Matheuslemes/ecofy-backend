@@ -34,6 +34,14 @@ public class RestExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "TRANSACTION_NOT_FOUND", ex.getMessage(), req);
     }
 
+    // Recurso escopado por usuário sem JWT válido -> 401.
+    @ExceptionHandler(org.springframework.security.authentication.AuthenticationCredentialsNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnauthenticated(
+            org.springframework.security.authentication.AuthenticationCredentialsNotFoundException ex,
+            HttpServletRequest req) {
+        return build(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", ex.getMessage(), req);
+    }
+
     // Regra não encontrada -> 404.
     @ExceptionHandler(RuleNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleRule(RuleNotFoundException ex, HttpServletRequest req) {

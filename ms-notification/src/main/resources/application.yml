@@ -29,10 +29,12 @@ spring:
   jackson:
     time-zone: UTC
 
+  # Configura a conexão do driver MongoDB no prefixo adotado pelo Spring Boot 4.
+  mongodb:
+    uri: ${MONGO_URI:mongodb://localhost:27017/ecofy_notification}
+
   data:
-    # Aponta para o banco local de desenvolvimento.
     mongodb:
-      uri: ${MONGO_URI:mongodb://localhost:27017/ecofy_notification}
       # Cria os índices por migration, e não na inicialização da aplicação.
       auto-index-creation: false
 

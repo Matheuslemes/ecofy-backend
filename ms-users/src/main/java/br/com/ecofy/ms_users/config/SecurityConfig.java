@@ -89,6 +89,17 @@ public class SecurityConfig {
                         internalTokenAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
+                .oauth2ResourceServer(oauth2 ->
+                        oauth2.jwt(Customizer.withDefaults())
+                )
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(
+                                new BearerTokenAuthenticationEntryPoint()
+                        )
+                        .accessDeniedHandler(
+                                new BearerTokenAccessDeniedHandler()
+                        )
+                )
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.sameOrigin())
                         .contentSecurityPolicy(csp -> csp
@@ -101,21 +112,6 @@ public class SecurityConfig {
                                         .NO_REFERRER
                         ))
                 );
-
-        if (!devPermitAll) {
-            http
-                    .oauth2ResourceServer(oauth2 ->
-                            oauth2.jwt(Customizer.withDefaults())
-                    )
-                    .exceptionHandling(exception -> exception
-                            .authenticationEntryPoint(
-                                    new BearerTokenAuthenticationEntryPoint()
-                            )
-                            .accessDeniedHandler(
-                                    new BearerTokenAccessDeniedHandler()
-                            )
-                    );
-        }
 
         return http.build();
     }

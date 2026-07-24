@@ -6,6 +6,7 @@ import br.com.ecofy.ms_budgeting.adapters.in.web.dto.response.BudgetOverviewResp
 import br.com.ecofy.ms_budgeting.adapters.in.web.dto.response.BudgetResponse;
 import br.com.ecofy.ms_budgeting.adapters.in.web.dto.response.PageResponse;
 import br.com.ecofy.ms_budgeting.adapters.in.web.security.AuthenticatedUser;
+import br.com.ecofy.ms_budgeting.adapters.in.web.support.MoneyCents;
 import br.com.ecofy.ms_budgeting.config.BudgetingProperties;
 import br.com.ecofy.ms_budgeting.core.application.command.CreateBudgetCommand;
 import br.com.ecofy.ms_budgeting.core.application.command.DeleteBudgetCommand;
@@ -113,7 +114,7 @@ public class BudgetController {
 
         var cmd = new CreateBudgetCommand(
                 owner, req.categoryId(), req.periodType(), req.periodStart(), req.periodEnd(),
-                req.limitAmount(), req.currency(), req.status());
+                MoneyCents.fromCents(req.limitAmountCents()), req.currency(), req.status());
 
         var created = createBudgetUseCase.create(cmd, idempotencyKey);
 
@@ -145,7 +146,10 @@ public class BudgetController {
         log.info("[BudgetController] - [update] -> id={} currency={} status={} version={}",
                 id, req.currency(), req.status(), req.version());
 
-        var cmd = new UpdateBudgetCommand(id, req.newLimitAmount(), req.currency(), req.status(), req.version());
+        var newLimit = req.newLimitAmountCents() == null
+                ? null
+                : MoneyCents.fromCents(req.newLimitAmountCents());
+        var cmd = new UpdateBudgetCommand(id, newLimit, req.currency(), req.status(), req.version());
         var updated = updateBudgetUseCase.update(cmd, idempotencyKey);
 
         return ResponseEntity.ok(BudgetResponse.from(updated));

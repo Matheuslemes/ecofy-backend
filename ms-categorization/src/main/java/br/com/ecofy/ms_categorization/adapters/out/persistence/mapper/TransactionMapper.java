@@ -34,6 +34,7 @@ public class TransactionMapper {
         return TransactionEntity.builder()
                 .id(d.getId())
                 .importJobId(d.getImportJobId())
+                .userId(d.getUserId())
                 .externalId(d.getExternalId())
                 .description(d.getDescription())
                 .merchantNormalized(d.getMerchant().getNormalized())
@@ -54,6 +55,7 @@ public class TransactionMapper {
         return new Transaction(
                 nonNullOrThrow(e.getId(), "entity.id must not be null"),
                 nonNullOrThrow(e.getImportJobId(), "entity.importJobId must not be null"),
+                e.getUserId(),
                 nonNullOrThrow(e.getExternalId(), "entity.externalId must not be null"),
                 nonNullOrDefault(e.getDescription()),
                 Merchant.of(e.getDescription()),

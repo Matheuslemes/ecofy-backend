@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      BGT_SECURITY_PERMIT_ALL: ${BGT_SECURITY_PERMIT_ALL:-true}
       DB_URL: jdbc:postgresql://postgres-budgeting:5432/ecofy_budgeting
       DB_USER: ecofy_budgeting
       DB_PASS: ecofy_budgeting

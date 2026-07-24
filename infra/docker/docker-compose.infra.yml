@@ -208,9 +208,14 @@ services:
     ports:
       - "1080:1080"
       - "1025:1025"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:1080/api/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks: [ecofy-net]
 
-  # Redis (ms-auth) — ECO-06: store distribuído para rate limiting + brute force.
+  # Redis (ms-auth): store distribuído para rate limiting + brute force.
   # Obrigatório ser distribuído (nada de memória local em prod). AOF ligado para
   # não perder contadores/bloqueios em restart; maxmemory-policy=noeviction para
   # NUNCA descartar silenciosamente contadores de limite (correção > economia).
@@ -231,7 +236,7 @@ services:
       retries: 10
     networks: [ecofy-net]
 
-  # Redis (ms-insights) — ECO-28 (Etapa 7): cache distribuído do dashboard/metrics.
+  # Redis (ms-insights): cache distribuído do dashboard/metrics.
   # Distribuído para servir múltiplas instâncias do ms-insights sem cache local divergente.
   # Cache é descartável (TTL): allkeys-lru é adequado (diferente do redis-auth, noeviction).
   redis-insights:

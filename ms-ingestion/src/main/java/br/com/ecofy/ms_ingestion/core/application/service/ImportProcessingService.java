@@ -383,7 +383,7 @@ public class ImportProcessingService implements StartImportJobUseCase, RetryFail
         // Publica o lote sem derrubar o job em falha, contando apenas o que o broker confirmou.
         private int publishBatch(List<RawTransaction> transactions) {
             try {
-                int published = publishTransactionForCategorizationPort.publish(transactions, job.correlationId());
+                int published = publishTransactionForCategorizationPort.publish(transactions, job.userId(), job.correlationId());
                 meterRegistry.counter("ecofy.ingestion.kafka.publish.total", "outcome", "success")
                         .increment(published);
                 return published;

@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      ING_SECURITY_PERMIT_ALL: ${ING_SECURITY_PERMIT_ALL:-true}
       DB_URL: jdbc:postgresql://postgres-ingestion:5432/ecofy_ingestion
       DB_USER: ecofy_ingestion
       DB_PASS: ecofy_ingestion

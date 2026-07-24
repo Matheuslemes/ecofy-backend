@@ -9,7 +9,7 @@ public record ApiErrorResponse(
 
         int status,
 
-        String error,
+        String errorCode,
 
         String message,
 

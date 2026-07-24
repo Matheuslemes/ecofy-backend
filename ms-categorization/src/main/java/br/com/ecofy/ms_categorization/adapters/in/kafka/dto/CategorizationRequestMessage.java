@@ -11,6 +11,8 @@ public record CategorizationRequestMessage(
         UUID transactionId,
         UUID importJobId,
 
+        UUID userId,
+
         String externalId,
 
         String description,

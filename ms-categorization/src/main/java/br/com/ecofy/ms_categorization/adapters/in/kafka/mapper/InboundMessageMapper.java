@@ -37,6 +37,7 @@ public class InboundMessageMapper {
         return new Transaction(
                 msg.transactionId(),
                 msg.importJobId(),
+                msg.userId(),
                 msg.externalId(),
                 rawDesc,
                 merchant,

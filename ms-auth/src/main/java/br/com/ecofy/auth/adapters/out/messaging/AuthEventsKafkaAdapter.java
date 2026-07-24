@@ -59,13 +59,14 @@ public class AuthEventsKafkaAdapter implements PublishAuthEventPort {
         Objects.requireNonNull(event, "event must not be null");
 
         AuthUser user = event.user();
-        String authUserId = user.id().value().toString();
+        UUID authUserId = user.id().value();
+        String authUserIdText = authUserId.toString();
         String eventId = UUID.randomUUID().toString();
         String correlationId = resolveCorrelationId();
 
         AuthUserRegisteredMessage message = new AuthUserRegisteredMessage(
-                null,
                 authUserId,
+                authUserIdText,
                 user.fullName(),
                 user.email().value(),
                 null,
@@ -80,7 +81,7 @@ public class AuthEventsKafkaAdapter implements PublishAuthEventPort {
         ProducerRecord<String, Object> record =
                 new ProducerRecord<>(
                         userRegisteredTopic,
-                        authUserId,
+                        authUserIdText,
                         message
                 );
 
@@ -96,7 +97,7 @@ public class AuthEventsKafkaAdapter implements PublishAuthEventPort {
         log.debug(
                 "[AuthEventsKafkaAdapter] - [publish(UserRegisteredEvent)] -> Enviando evento topic={} key={} eventId={}",
                 userRegisteredTopic,
-                authUserId,
+                authUserIdText,
                 eventId
         );
 

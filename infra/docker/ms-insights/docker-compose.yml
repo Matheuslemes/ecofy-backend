@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      INS_SECURITY_PERMIT_ALL: ${INS_SECURITY_PERMIT_ALL:-true}
       DB_URL: jdbc:postgresql://postgres-insights:5432/ecofy_insights
       DB_USER: ecofy_insights
       DB_PASS: ecofy_insights

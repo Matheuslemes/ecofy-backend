@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,6 +46,20 @@ public class TransactionJpaAdapter implements LoadTransactionPortOut, SaveTransa
 
         return repo.findByImportJobIdAndExternalId(importJobId, externalId)
                 .map(mapper::toDomain);
+    }
+
+    // Lista as transações do usuário (todas ou apenas as não categorizadas).
+    @Override
+    public List<Transaction> listByUser(UUID userId, boolean onlyUncategorized) {
+        Objects.requireNonNull(userId, "userId must not be null");
+
+        log.debug("[TransactionJpaAdapter] - [listByUser] -> userId={} onlyUncategorized={}", userId, onlyUncategorized);
+
+        var entities = onlyUncategorized
+                ? repo.findByUserIdAndCategoryIdIsNullOrderByTransactionDateDesc(userId)
+                : repo.findByUserIdOrderByTransactionDateDesc(userId);
+
+        return entities.stream().map(mapper::toDomain).toList();
     }
 
     // Persiste a transação e retorna o domínio reconstituído.

@@ -1,9 +1,8 @@
 # Configura o ambiente de produção.
 spring:
-  data:
-    # Exige o endereço do banco por variável de ambiente, sem default local.
-    mongodb:
-      uri: ${MONGO_URI}
+  # Exige o endereço do banco por variável de ambiente, sem default local.
+  mongodb:
+    uri: ${MONGO_URI}
 
   kafka:
     # Exige o endereço do broker por variável de ambiente, sem default local.

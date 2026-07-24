@@ -111,7 +111,7 @@ public class AuthUserSyncService implements UpsertUserFromAuthUseCase {
         }
 
         EcoUserProfile created = EcoUserProfile.builder()
-                .id(UserId.of(UUID.randomUUID()))
+                .id(deriveProfileId(externalAuthId))
                 .externalAuthId(externalAuthId)
                 .email(email)
                 .fullName(fullName)
@@ -238,11 +238,9 @@ public class AuthUserSyncService implements UpsertUserFromAuthUseCase {
         }
 
         EcoUserProfile created = EcoUserProfile.builder()
-                .id(UserId.of(
-                        userId != null
-                                ? userId
-                                : UUID.randomUUID()
-                ))
+                .id(userId != null
+                        ? UserId.of(userId)
+                        : deriveProfileId(externalAuthId))
                 .externalAuthId(externalAuthId)
                 .fullName(fullName)
                 .email(email)
@@ -380,6 +378,19 @@ public class AuthUserSyncService implements UpsertUserFromAuthUseCase {
         return locale == null || locale.isBlank()
                 ? "pt-BR"
                 : locale;
+    }
+
+    private static UserId deriveProfileId(ExternalAuthId externalAuthId) {
+        if (externalAuthId != null) {
+            try {
+                return UserId.of(UUID.fromString(externalAuthId.value()));
+            } catch (IllegalArgumentException ex) {
+                log.warn(
+                        "[AuthUserSyncService] - [deriveProfileId] -> externalAuthId não é um UUID; gerando id aleatório para o perfil"
+                );
+            }
+        }
+        return UserId.newId();
     }
 
     // Converte o identificador externo informado em um objeto de valor opcional.

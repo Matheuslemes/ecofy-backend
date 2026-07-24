@@ -27,6 +27,9 @@ public class TransactionEntity {
     @Column(name = "import_job_id", columnDefinition = "uuid", nullable = false)
     private UUID importJobId;
 
+    @Column(name = "user_id", columnDefinition = "uuid")
+    private UUID userId;
+
     @Column(name = "external_id", nullable = false, length = 120)
     private String externalId;
 

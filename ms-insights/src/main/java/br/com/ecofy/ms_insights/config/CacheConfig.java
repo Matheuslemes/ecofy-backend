@@ -28,7 +28,10 @@ public class CacheConfig {
     @ConditionalOnProperty(name = "ecofy.insights.cache.enabled", havingValue = "true", matchIfMissing = true)
     public CacheManager redisCacheManager(RedisConnectionFactory connectionFactory,
                                           InsightsProperties props, ObjectMapper objectMapper) {
-        var serializer = new GenericJackson2JsonRedisSerializer(objectMapper);
+        var serializer = GenericJackson2JsonRedisSerializer.builder()
+                .objectMapper(objectMapper.copy())
+                .defaultTyping(true)
+                .build();
         RedisCacheConfiguration base = RedisCacheConfiguration.defaultCacheConfig()
                 .disableCachingNullValues()
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer));

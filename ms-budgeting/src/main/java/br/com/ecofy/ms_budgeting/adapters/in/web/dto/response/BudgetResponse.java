@@ -1,5 +1,6 @@
 package br.com.ecofy.ms_budgeting.adapters.in.web.dto.response;
 
+import br.com.ecofy.ms_budgeting.adapters.in.web.support.MoneyCents;
 import br.com.ecofy.ms_budgeting.core.application.result.BudgetResult;
 
 import java.time.Instant;
@@ -24,7 +25,8 @@ public record BudgetResponse(
 
         String currency,
 
-        String limitAmount,
+        // COMP-011: limite em centavos inteiros (antes: String decimal), alinhado a insights/goals.
+        long limitAmountCents,
 
         Instant createdAt,
 
@@ -38,9 +40,9 @@ public record BudgetResponse(
     // Construtor de compatibilidade (sem versão) — preserva chamadas existentes.
     public BudgetResponse(UUID id, UUID userId, UUID categoryId, String periodType,
                           LocalDate periodStart, LocalDate periodEnd, String status, String currency,
-                          String limitAmount, Instant createdAt, Instant updatedAt) {
+                          long limitAmountCents, Instant createdAt, Instant updatedAt) {
         this(id, userId, categoryId, periodType, periodStart, periodEnd, status, currency,
-                limitAmount, createdAt, updatedAt, null);
+                limitAmountCents, createdAt, updatedAt, null);
     }
 
     // converte o resultado do caso de uso (BudgetResult) para o DTO de resposta da API
@@ -54,7 +56,7 @@ public record BudgetResponse(
                 r.periodEnd(),
                 r.status().name(),
                 r.currency(),
-                r.limitAmount().toPlainString(),
+                MoneyCents.toCents(r.limitAmount()),
                 r.createdAt(),
                 r.updatedAt(),
                 r.version()

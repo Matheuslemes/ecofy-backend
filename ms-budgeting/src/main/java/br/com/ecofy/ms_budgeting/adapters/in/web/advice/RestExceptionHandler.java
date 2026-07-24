@@ -32,7 +32,7 @@ public class RestExceptionHandler {
             BudgetingValidationException ex,
             HttpServletRequest req
     ) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req, Map.of("code", ex.getCode()));
+        return build(HttpStatus.BAD_REQUEST, ex.getCode(), ex.getMessage(), req);
     }
 
     @ExceptionHandler(BudgetingApplicationException.class)
@@ -41,7 +41,7 @@ public class RestExceptionHandler {
             BudgetingApplicationException ex,
             HttpServletRequest req
     ) {
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Processing error", req, Map.of("code", ex.getCode()));
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, ex.getCode(), "Processing error", req);
     }
 
     @ExceptionHandler(BudgetNotFoundException.class)
@@ -50,7 +50,7 @@ public class RestExceptionHandler {
             BudgetNotFoundException ex,
             HttpServletRequest req
     ) {
-        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req, Map.of("code", "BUDGET_NOT_FOUND"));
+        return build(HttpStatus.NOT_FOUND, "BUDGET_NOT_FOUND", ex.getMessage(), req);
     }
 
     @ExceptionHandler(BudgetAlreadyExistsException.class)
@@ -59,7 +59,7 @@ public class RestExceptionHandler {
             BudgetAlreadyExistsException ex,
             HttpServletRequest req
     ) {
-        return build(HttpStatus.CONFLICT, ex.getMessage(), req, Map.of("code", "BUDGET_ALREADY_EXISTS"));
+        return build(HttpStatus.CONFLICT, "BUDGET_ALREADY_EXISTS", ex.getMessage(), req);
     }
 
     @ExceptionHandler(IdempotencyViolationException.class)
@@ -68,7 +68,7 @@ public class RestExceptionHandler {
             IdempotencyViolationException ex,
             HttpServletRequest req
     ) {
-        return build(HttpStatus.CONFLICT, ex.getMessage(), req, Map.of("code", "DUPLICATE_EVENT"));
+        return build(HttpStatus.CONFLICT, "DUPLICATE_EVENT", ex.getMessage(), req);
     }
 
     @ExceptionHandler(BusinessValidationException.class)
@@ -77,7 +77,7 @@ public class RestExceptionHandler {
             BusinessValidationException ex,
             HttpServletRequest req
     ) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req, Map.of("code", "VALIDATION_ERROR"));
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", ex.getMessage(), req);
     }
 
     @ExceptionHandler(BudgetAccessForbiddenException.class)
@@ -86,7 +86,7 @@ public class RestExceptionHandler {
             BudgetAccessForbiddenException ex,
             HttpServletRequest req
     ) {
-        return build(HttpStatus.FORBIDDEN, "Access denied", req, Map.of("code", "BUDGET_ACCESS_FORBIDDEN"));
+        return build(HttpStatus.FORBIDDEN, "BUDGET_ACCESS_FORBIDDEN", "Access denied", req);
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
@@ -97,9 +97,9 @@ public class RestExceptionHandler {
     ) {
         return build(
                 HttpStatus.CONFLICT,
+                "BUDGET_CONCURRENT_UPDATE",
                 "O orçamento foi alterado por outra operação. Atualize os dados e tente novamente.",
-                req,
-                Map.of("code", "BUDGET_CONCURRENT_UPDATE")
+                req
         );
     }
 
@@ -111,9 +111,9 @@ public class RestExceptionHandler {
     ) {
         return build(
                 HttpStatus.BAD_REQUEST,
+                "PAGINATION_PARAMETER_INVALID",
                 ex.getMessage(),
-                req,
-                Map.of("code", "PAGINATION_PARAMETER_INVALID")
+                req
         );
     }
 
@@ -123,17 +123,13 @@ public class RestExceptionHandler {
             MethodArgumentNotValidException ex,
             HttpServletRequest req
     ) {
-        Map<String, Object> details = new LinkedHashMap<>();
         Map<String, String> fields = new LinkedHashMap<>();
 
         ex.getBindingResult()
                 .getFieldErrors()
                 .forEach(error -> fields.put(error.getField(), error.getDefaultMessage()));
 
-        details.put("fields", fields);
-        details.put("code", "VALIDATION_ERROR");
-
-        return build(HttpStatus.BAD_REQUEST, "Invalid payload", req, details);
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Invalid payload", req, Map.of("fields", fields));
     }
 
     @ExceptionHandler(Exception.class)
@@ -144,15 +140,28 @@ public class RestExceptionHandler {
     ) {
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR,
+                "INTERNAL_SERVER_ERROR",
                 "Ocorreu um erro interno ao processar a solicitação.",
-                req,
-                Map.of("code", "INTERNAL_SERVER_ERROR")
+                req
         );
     }
 
-    // Constrói a resposta de erro com os dados de rastreamento disponíveis.
+    // Constrói a resposta de erro sem detalhes adicionais.
     private ResponseEntity<ApiErrorResponse> build(
             HttpStatus status,
+            String errorCode,
+            String message,
+            HttpServletRequest req
+    ) {
+        return build(status, errorCode, message, req, Map.of());
+    }
+
+    // Constrói a resposta de erro com o código de negócio no topo e os
+    // dados de rastreamento disponíveis. `details` carrega apenas informações extras
+    // (ex.: erros por campo) — o código de negócio agora vai em `errorCode`.
+    private ResponseEntity<ApiErrorResponse> build(
+            HttpStatus status,
+            String errorCode,
             String message,
             HttpServletRequest req,
             Map<String, Object> details
@@ -170,7 +179,7 @@ public class RestExceptionHandler {
         ApiErrorResponse body = new ApiErrorResponse(
                 Instant.now(),
                 status.value(),
-                status.getReasonPhrase(),
+                errorCode,
                 message,
                 req.getRequestURI(),
                 traceId,

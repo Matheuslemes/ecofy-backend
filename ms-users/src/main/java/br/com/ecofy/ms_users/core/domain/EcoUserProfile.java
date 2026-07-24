@@ -10,6 +10,7 @@ import lombok.Getter;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
 @Getter
 @Builder(toBuilder = true)
@@ -45,7 +46,7 @@ public class EcoUserProfile {
         // externalAuthId e email normalmente são obrigatórios em sync de Auth,
         // mas aqui não forçamos exception para manter compatível com eventos incompletos.
         return EcoUserProfile.builder()
-                .id(UserId.newId())
+                .id(profileIdFromAuth(externalAuthId))
                 .externalAuthId(externalAuthId)
                 .email(email)
                 .fullName(fullName)
@@ -55,6 +56,17 @@ public class EcoUserProfile {
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
+    }
+
+    private static UserId profileIdFromAuth(ExternalAuthId externalAuthId) {
+        if (externalAuthId != null) {
+            try {
+                return UserId.of(UUID.fromString(externalAuthId.value()));
+            } catch (IllegalArgumentException ignored) {
+                // externalAuthId não é um UUID — cai para id aleatório abaixo.
+            }
+        }
+        return UserId.newId();
     }
 
     // Atualiza o perfil com os dados sincronizados do ms-auth, preservando os campos que ele não governa.

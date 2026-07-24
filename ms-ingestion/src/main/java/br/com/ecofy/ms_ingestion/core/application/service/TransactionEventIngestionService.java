@@ -114,7 +114,7 @@ public class TransactionEventIngestionService implements IngestTransactionEventU
 
         int published = 0;
         try {
-            published = publishTransactionForCategorizationPort.publish(inserted, command.correlationId());
+            published = publishTransactionForCategorizationPort.publish(inserted, job.userId(), command.correlationId());
         } catch (Exception e) {
             log.error("[TransactionEventIngestionService] - [ingest] -> Falha ao publicar eventId={} error={}",
                     command.eventId(), e.getMessage());

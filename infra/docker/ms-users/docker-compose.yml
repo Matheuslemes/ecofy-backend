@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      USR_SECURITY_PERMIT_ALL: ${USR_SECURITY_PERMIT_ALL:-true}
       DB_URL: jdbc:postgresql://postgres-users:5432/ecofy_users
       DB_USER: ecofy_users
       DB_PASS: ecofy_users

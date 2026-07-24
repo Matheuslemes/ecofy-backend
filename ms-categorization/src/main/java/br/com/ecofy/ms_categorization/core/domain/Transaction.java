@@ -13,6 +13,7 @@ public final class Transaction {
 
     private final UUID id;
     private final UUID importJobId;
+    private final UUID userId;
     private final String externalId;
     private final String description;
     private final Merchant merchant;
@@ -23,9 +24,28 @@ public final class Transaction {
     private final Instant createdAt;
     private final Instant updatedAt;
 
+    // Construtor de compatibilidade (sem userId) — preserva chamadas existentes.
     public Transaction(
             UUID id,
             UUID importJobId,
+            String externalId,
+            String description,
+            Merchant merchant,
+            LocalDate transactionDate,
+            Money money,
+            String sourceType,
+            UUID categoryId,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+        this(id, importJobId, null, externalId, description, merchant, transactionDate, money,
+                sourceType, categoryId, createdAt, updatedAt);
+    }
+
+    public Transaction(
+            UUID id,
+            UUID importJobId,
+            UUID userId,
             String externalId,
             String description,
             Merchant merchant,
@@ -47,6 +67,7 @@ public final class Transaction {
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
         this.categoryId = categoryId;
+        this.userId = userId;
     }
 
     public UUID getId() {
@@ -55,6 +76,10 @@ public final class Transaction {
 
     public UUID getImportJobId() {
         return importJobId;
+    }
+
+    public UUID getUserId() {
+        return userId;
     }
 
     public String getExternalId() {
@@ -96,7 +121,7 @@ public final class Transaction {
     // Aplica uma categoria preservando a imutabilidade da transação.
     public Transaction withCategory(UUID categoryId, Instant now) {
         return new Transaction(
-                id, importJobId, externalId, description, merchant, transactionDate, money, sourceType,
+                id, importJobId, userId, externalId, description, merchant, transactionDate, money, sourceType,
                 categoryId, createdAt, now
         );
     }
@@ -107,6 +132,7 @@ public final class Transaction {
         if (!(o instanceof Transaction that)) return false;
         return id.equals(that.id) &&
                 importJobId.equals(that.importJobId) &&
+                Objects.equals(userId, that.userId) &&
                 externalId.equals(that.externalId) &&
                 description.equals(that.description) &&
                 merchant.equals(that.merchant) &&
@@ -121,7 +147,7 @@ public final class Transaction {
     @Override
     public int hashCode() {
         return Objects.hash(
-                id, importJobId, externalId, description, merchant, transactionDate,
+                id, importJobId, userId, externalId, description, merchant, transactionDate,
                 money, sourceType, categoryId, createdAt, updatedAt
         );
     }
@@ -131,6 +157,7 @@ public final class Transaction {
         return "Transaction[" +
                 "id=" + id +
                 ", importJobId=" + importJobId +
+                ", userId=" + userId +
                 ", externalId=" + externalId +
                 ", description=" + description +
                 ", merchant=" + merchant +

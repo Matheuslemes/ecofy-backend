@@ -8,6 +8,7 @@ public record CategorizationRequestMessage(
 
         UUID transactionId,
         UUID importJobId,
+        UUID userId,
         String description,
         BigDecimal amount,
         String currency,

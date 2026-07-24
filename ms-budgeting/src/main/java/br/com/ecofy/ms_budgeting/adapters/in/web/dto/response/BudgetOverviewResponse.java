@@ -9,7 +9,7 @@ public record BudgetOverviewResponse(
 
         UUID userId,
 
-        List<?> consumptions,
+        List<BudgetConsumptionResponse> consumptions,
 
         List<?> alerts
 
@@ -17,7 +17,10 @@ public record BudgetOverviewResponse(
 
     // converte o resultado da aplicação (use case) para o DTO de resposta da API
     public static BudgetOverviewResponse from(BudgetOverviewResult r) {
-        return new BudgetOverviewResponse(r.userId(), r.consumptions(), r.alerts());
+        List<BudgetConsumptionResponse> consumptions = r.consumptions().stream()
+                .map(BudgetConsumptionResponse::from)
+                .toList();
+        return new BudgetOverviewResponse(r.userId(), consumptions, r.alerts());
     }
 
 }

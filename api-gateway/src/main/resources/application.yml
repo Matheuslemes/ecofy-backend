@@ -26,6 +26,9 @@ spring:
           # Aplica os filtros padrão a todas as rotas.
           default-filters:
             - RemoveRequestHeader=Cookie
+            # O gateway valida o CORS externo; os serviços internos não devem
+            # reprocessar a origem do navegador e rejeitar uma origem já aceita.
+            - RemoveRequestHeader=Origin
             - AddRequestHeader=X-Gateway, api-gateway
             - DedupeResponseHeader=X-Correlation-Id, RETAIN_FIRST
 
@@ -273,8 +276,8 @@ ecofy:
       allowed-origins:
         - ${ECOFY_CORS_ALLOWED_ORIGIN:http://localhost:3000}
       allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-      allowed-headers: [Authorization, Content-Type, X-Correlation-Id]
-      exposed-headers: [X-Correlation-Id]
+      allowed-headers: [Authorization, Content-Type, X-Correlation-Id, Idempotency-Key]
+      exposed-headers: [X-Correlation-Id, Location, Retry-After]
       allow-credentials: false
       max-age: 3600
 

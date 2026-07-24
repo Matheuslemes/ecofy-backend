@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      CAT_SECURITY_PERMIT_ALL: ${CAT_SECURITY_PERMIT_ALL:-true}
       DB_URL: jdbc:postgresql://postgres-categorization:5432/ecofy_categorization
       DB_USER: ecofy_categorization
       DB_PASS: ecofy_categorization

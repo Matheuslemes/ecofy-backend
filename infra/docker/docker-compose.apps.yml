@@ -1,0 +1,260 @@
+# =============================================================================
+# EcoFy — aplicações (8 serviços: api-gateway + 7 ms-*)
+#
+# Este arquivo NÃO roda sozinho: ele é incluído pelo docker-compose.yml da raiz
+# JUNTO com docker-compose.infra.yml (mesmo projeto "ecofy"). A infraestrutura
+# (postgres, kafka, redis, mongo, maildev) e a rede ecofy-net são criadas lá.
+#
+#   docker compose up -d --build      # na raiz: sobe infraestrutura + aplicações
+#   docker compose ps                 # estado e healthcheck de cada serviço
+#
+# As imagens são construídas a partir do Dockerfile de cada serviço (multi-stage
+# Maven + JDK 25). Os contextos de build são relativos a este arquivo
+# (infra/docker/ -> ../../<serviço> aponta para a raiz do repositório).
+# =============================================================================
+
+services:
+
+  ms-auth:
+    build:
+      context: ../../ms-auth
+    image: ecofy/ms-auth:local
+    container_name: ecofy-ms-auth
+    restart: unless-stopped
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis-auth:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      maildev:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      DB_URL: jdbc:postgresql://postgres-auth:5432/ecofy_auth
+      DB_USER: ecofy_auth
+      DB_PASS: ecofy_auth
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis-auth
+      REDIS_PORT: 6379
+      MAIL_HOST: maildev
+      MAIL_PORT: 1025
+      MAIL_SMTP_AUTH: "false"
+      MAIL_SMTP_STARTTLS_ENABLE: "false"
+      FRONTEND_BASE_URL: http://localhost:5173
+      JWT_ISSUER: http://localhost:8081/auth
+      USERS_MS_BASE_URL: http://ms-users:8087/users
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-local-internal-token}
+      TZ: UTC
+    ports:
+      - "8081:8081"
+    networks: [ ecofy-net ]
+
+  ms-users:
+    build:
+      context: ../../ms-users
+    image: ecofy/ms-users:local
+    container_name: ecofy-ms-users
+    restart: unless-stopped
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # COMP-014: default uniforme de permit-all no dev (todos os serviços de negócio
+      # liberam endpoints; requisições autenticadas continuam extraindo o "sub" do JWT).
+      USR_SECURITY_PERMIT_ALL: ${USR_SECURITY_PERMIT_ALL:-true}
+      DB_URL: jdbc:postgresql://postgres-users:5432/ecofy_users
+      DB_USER: ecofy_users
+      DB_PASS: ecofy_users
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_JWKS_URI: http://ms-auth:8081/auth/.well-known/jwks.json
+      AUTH_MS_BASE_URL: http://ms-auth:8081/auth
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-local-internal-token}
+      TZ: UTC
+    ports:
+      - "8087:8087"
+    networks: [ ecofy-net ]
+
+  ms-ingestion:
+    build:
+      context: ../../ms-ingestion
+    image: ecofy/ms-ingestion:local
+    container_name: ecofy-ms-ingestion
+    restart: unless-stopped
+    depends_on:
+      postgres-ingestion:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # COMP-014: permit-all uniforme no dev (/api/import/** permanece sempre protegido).
+      ING_SECURITY_PERMIT_ALL: ${ING_SECURITY_PERMIT_ALL:-true}
+      DB_URL: jdbc:postgresql://postgres-ingestion:5432/ecofy_ingestion
+      DB_USER: ecofy_ingestion
+      DB_PASS: ecofy_ingestion
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_JWKS_URI: http://ms-auth:8081/auth/.well-known/jwks.json
+      ING_STORAGE_BASE_PATH: /var/lib/ecofy/ms-ingestion/storage
+      ING_STORAGE_TMP_DIR: /var/lib/ecofy/ms-ingestion/tmp
+      TZ: UTC
+    ports:
+      - "8082:8082"
+    volumes:
+      - ecofy-ingestion-storage:/var/lib/ecofy/ms-ingestion
+    networks: [ ecofy-net ]
+
+  ms-categorization:
+    build:
+      context: ../../ms-categorization
+    image: ecofy/ms-categorization:local
+    container_name: ecofy-ms-categorization
+    restart: unless-stopped
+    depends_on:
+      postgres-categorization:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # COMP-014: permit-all uniforme no dev.
+      CAT_SECURITY_PERMIT_ALL: ${CAT_SECURITY_PERMIT_ALL:-true}
+      DB_URL: jdbc:postgresql://postgres-categorization:5432/ecofy_categorization
+      DB_USER: ecofy_categorization
+      DB_PASS: ecofy_categorization
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_JWKS_URI: http://ms-auth:8081/auth/.well-known/jwks.json
+      TZ: UTC
+    ports:
+      - "8083:8083"
+    networks: [ ecofy-net ]
+
+  ms-budgeting:
+    build:
+      context: ../../ms-budgeting
+    image: ecofy/ms-budgeting:local
+    container_name: ecofy-ms-budgeting
+    restart: unless-stopped
+    depends_on:
+      postgres-budgeting:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # COMP-014: permit-all uniforme no dev.
+      BGT_SECURITY_PERMIT_ALL: ${BGT_SECURITY_PERMIT_ALL:-true}
+      DB_URL: jdbc:postgresql://postgres-budgeting:5432/ecofy_budgeting
+      DB_USER: ecofy_budgeting
+      DB_PASS: ecofy_budgeting
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_JWKS_URI: http://ms-auth:8081/auth/.well-known/jwks.json
+      TZ: UTC
+    ports:
+      - "8084:8084"
+    networks: [ ecofy-net ]
+
+  ms-insights:
+    build:
+      context: ../../ms-insights
+    image: ecofy/ms-insights:local
+    container_name: ecofy-ms-insights
+    restart: unless-stopped
+    depends_on:
+      postgres-insights:
+        condition: service_healthy
+      redis-insights:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # COMP-014: permit-all uniforme no dev.
+      INS_SECURITY_PERMIT_ALL: ${INS_SECURITY_PERMIT_ALL:-true}
+      DB_URL: jdbc:postgresql://postgres-insights:5432/ecofy_insights
+      DB_USER: ecofy_insights
+      DB_PASS: ecofy_insights
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_JWKS_URI: http://ms-auth:8081/auth/.well-known/jwks.json
+      REDIS_HOST: redis-insights
+      REDIS_PORT: 6379
+      INS_CLIENT_CATEGORIZATION_BASE_URL: http://ms-categorization:8083/categorization
+      INS_CLIENT_BUDGETING_BASE_URL: http://ms-budgeting:8084/budgeting
+      TZ: UTC
+    ports:
+      - "8085:8085"
+    networks: [ ecofy-net ]
+
+  ms-notification:
+    build:
+      context: ../../ms-notification
+    image: ecofy/ms-notification:local
+    container_name: ecofy-ms-notification
+    restart: unless-stopped
+    depends_on:
+      mongo-notification:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # COMP-014: permit-all uniforme no dev.
+      NTF_SECURITY_PERMIT_ALL: ${NTF_SECURITY_PERMIT_ALL:-true}
+      MONGO_URI: mongodb://mongo-notification:27017/ecofy_notification
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_JWKS_URI: http://ms-auth:8081/auth/.well-known/jwks.json
+      ECOFY_USERS_INTERNAL_URL: http://ms-users:8087/users
+      ECOFY_INTERNAL_SERVICE_TOKEN: ${INTERNAL_TOKEN:-local-internal-token}
+      TZ: UTC
+    ports:
+      - "8086:8086"
+    networks: [ ecofy-net ]
+
+  api-gateway:
+    build:
+      context: ../../api-gateway
+    image: ecofy/api-gateway:local
+    container_name: ecofy-api-gateway
+    restart: unless-stopped
+    depends_on:
+      ms-auth:
+        condition: service_started
+      ms-users:
+        condition: service_started
+      ms-ingestion:
+        condition: service_started
+      ms-categorization:
+        condition: service_started
+      ms-budgeting:
+        condition: service_started
+      ms-insights:
+        condition: service_started
+      ms-notification:
+        condition: service_started
+    environment:
+
+      SPRING_PROFILES_ACTIVE: dev
+      MS_AUTH_URI: http://ms-auth:8081
+      MS_USERS_URI: http://ms-users:8087
+      MS_INGESTION_URI: http://ms-ingestion:8082
+      MS_CATEGORIZATION_URI: http://ms-categorization:8083
+      MS_BUDGETING_URI: http://ms-budgeting:8084
+      MS_INSIGHTS_URI: http://ms-insights:8085
+      MS_NOTIFICATION_URI: http://ms-notification:8086
+      TZ: UTC
+    ports:
+      - "8080:8080"
+    networks: [ ecofy-net ]
+
+volumes:
+  ecofy-ingestion-storage:
+
+networks:
+  # Mesma definição de docker-compose.infra.yml (rede única do projeto). Ao ser
+  # incluído junto com a infra, ambos apontam para a rede nomeada ecofy-net.
+  ecofy-net:
+    name: ecofy-net

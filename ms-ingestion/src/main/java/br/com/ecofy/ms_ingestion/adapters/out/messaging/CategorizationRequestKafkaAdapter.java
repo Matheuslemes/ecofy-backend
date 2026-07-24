@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 // Publica transações para o fluxo assíncrono de categorização.
@@ -43,7 +44,7 @@ public class CategorizationRequestKafkaAdapter implements PublishTransactionForC
 
     // Publica o lote e contabiliza individualmente as confirmações do broker.
     @Override
-    public int publish(List<RawTransaction> transactions, String correlationId) {
+    public int publish(List<RawTransaction> transactions, UUID userId, String correlationId) {
         Objects.requireNonNull(transactions, "transactions must not be null");
 
         if (transactions.isEmpty()) {
@@ -55,7 +56,7 @@ public class CategorizationRequestKafkaAdapter implements PublishTransactionForC
 
         List<CompletableFuture<SendResult<String, Object>>> futures = new ArrayList<>(transactions.size());
         for (RawTransaction tx : transactions) {
-            futures.add(kafkaTemplate.send(toRecord(topic, tx, traceId)));
+            futures.add(kafkaTemplate.send(toRecord(topic, tx, userId, traceId)));
         }
 
         int confirmed = 0;
@@ -76,8 +77,8 @@ public class CategorizationRequestKafkaAdapter implements PublishTransactionForC
     }
 
     // Converte a transação em registro particionado com metadados de rastreamento.
-    private ProducerRecord<String, Object> toRecord(String topic, RawTransaction tx, String traceId) {
-        CategorizationRequestMessage message = CategorizationMessageMapper.from(tx);
+    private ProducerRecord<String, Object> toRecord(String topic, RawTransaction tx, UUID userId, String traceId) {
+        CategorizationRequestMessage message = CategorizationMessageMapper.from(tx, userId);
 
         ProducerRecord<String, Object> record = new ProducerRecord<>(topic, tx.id().toString(), message);
 

@@ -1,15 +1,13 @@
 package br.com.ecofy.ms_budgeting.adapters.in.web.dto.request;
 
 import br.com.ecofy.ms_budgeting.core.domain.enums.BudgetStatus;
-import jakarta.validation.constraints.DecimalMin;
-
-import java.math.BigDecimal;
+import jakarta.validation.constraints.Min;
 
 // Representa os dados permitidos para atualização de um orçamento.
 public record UpdateBudgetRequest(
 
-        @DecimalMin(value = "0.01")
-        BigDecimal newLimitAmount,
+        @Min(value = 1)
+        Long newLimitAmountCents,
 
         String currency,
 
@@ -18,7 +16,7 @@ public record UpdateBudgetRequest(
         Long version
 
 ) {
-    public UpdateBudgetRequest(BigDecimal newLimitAmount, String currency, BudgetStatus status) {
-        this(newLimitAmount, currency, status, null);
+    public UpdateBudgetRequest(Long newLimitAmountCents, String currency, BudgetStatus status) {
+        this(newLimitAmountCents, currency, status, null);
     }
 }

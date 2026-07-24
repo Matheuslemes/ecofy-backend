@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      NTF_SECURITY_PERMIT_ALL: ${NTF_SECURITY_PERMIT_ALL:-true}
       MONGO_URI: mongodb://mongo-notification:27017/ecofy_notification
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_JWKS_URI: http://ms-auth:8081/auth/.well-known/jwks.json
