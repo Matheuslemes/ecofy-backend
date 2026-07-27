@@ -18,6 +18,7 @@ services:
     image: ecofy/ms-users:local
     container_name: ecofy-ms-users
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       USR_SECURITY_PERMIT_ALL: ${USR_SECURITY_PERMIT_ALL:-true}

@@ -26,11 +26,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-// Centraliza o registro de usuários e a confirmação de endereços de e-mail.
+// Centraliza o registro de usuários e a confirmação opcional de endereços de e-mail.
 @RestController
 @RequestMapping(path = {"/api/v1/auth/register", "/api/register"}, produces = MediaType.APPLICATION_JSON_VALUE)
 @Validated
-@Tag(name = "Registration", description = "Registro de novos usuários e confirmação de e-mail")
+@Tag(name = "Registration", description = "Registro de novos usuários e confirmação opcional de e-mail")
 @Slf4j
 @RequiredArgsConstructor
 public class RegistrationController {
@@ -43,7 +43,7 @@ public class RegistrationController {
             summary = "Registra um novo usuário",
             description = """
                     Cria um novo usuário no ms-auth.
-                    Se a confirmação de e-mail estiver habilitada, envia e-mail com token de verificação.
+                    O usuário é ativado imediatamente, sem exigir confirmação de e-mail.
                     """
     )
     @ApiResponses({
@@ -70,7 +70,7 @@ public class RegistrationController {
                 request.firstName(),
                 request.lastName(),
                 request.locale() != null ? request.locale() : "pt-BR",
-                false,
+                true,
                 List.of("ROLE_USER")
         );
 

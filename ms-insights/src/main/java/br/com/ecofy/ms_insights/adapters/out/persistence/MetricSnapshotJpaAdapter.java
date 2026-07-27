@@ -3,6 +3,7 @@ package br.com.ecofy.ms_insights.adapters.out.persistence;
 import br.com.ecofy.ms_insights.adapters.out.persistence.mapper.MetricSnapshotMapper;
 import br.com.ecofy.ms_insights.adapters.out.persistence.repository.MetricSnapshotRepository;
 import br.com.ecofy.ms_insights.core.domain.MetricSnapshot;
+import br.com.ecofy.ms_insights.core.port.out.LoadMetricSnapshotsPort;
 import br.com.ecofy.ms_insights.core.port.out.SaveMetricSnapshotPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -11,11 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 @Slf4j
 @Component
-public class MetricSnapshotJpaAdapter implements SaveMetricSnapshotPort {
+public class MetricSnapshotJpaAdapter implements
+        SaveMetricSnapshotPort,
+        LoadMetricSnapshotsPort {
 
     private final MetricSnapshotRepository repository;
 
@@ -60,6 +65,19 @@ public class MetricSnapshotJpaAdapter implements SaveMetricSnapshotPort {
                     safeSnapshotId(snapshot), safeUserId(snapshot), safeMetricType(snapshot), ex.getMessage(), ex);
             throw ex;
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MetricSnapshot> findRecentForUser(UUID userId, int limit) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        int normalizedLimit = Math.max(1, Math.min(limit, 50));
+
+        return repository.findTop50ByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .limit(normalizedLimit)
+                .map(MetricSnapshotMapper::toDomain)
+                .toList();
     }
 
     // Calcula o tempo decorrido em milissegundos desde startedAt para métricas de observabilidade.

@@ -18,6 +18,7 @@ services:
     image: ecofy/ms-budgeting:local
     container_name: ecofy-ms-budgeting
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       BGT_SECURITY_PERMIT_ALL: ${BGT_SECURITY_PERMIT_ALL:-true}

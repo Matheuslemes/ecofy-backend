@@ -18,6 +18,7 @@ services:
     image: ecofy/ms-auth:local
     container_name: ecofy-ms-auth
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       DB_URL: jdbc:postgresql://postgres-auth:5432/ecofy_auth
@@ -28,6 +29,9 @@ services:
       REDIS_PORT: 6379
       MAIL_HOST: maildev
       MAIL_PORT: 1025
+      MAIL_SMTP_AUTH: "false"
+      MAIL_SMTP_STARTTLS_ENABLE: "false"
+      FRONTEND_BASE_URL: http://localhost:5173
       JWT_ISSUER: http://localhost:8081/auth
       USERS_MS_BASE_URL: http://ms-users:8087/users
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-local-internal-token}

@@ -4,10 +4,12 @@ import br.com.ecofy.ms_insights.config.CacheConfig;
 import br.com.ecofy.ms_insights.core.application.result.GoalResult;
 import br.com.ecofy.ms_insights.core.application.result.InsightResult;
 import br.com.ecofy.ms_insights.core.application.result.InsightsBundleResult;
+import br.com.ecofy.ms_insights.core.application.result.MetricSnapshotResult;
 import br.com.ecofy.ms_insights.core.port.in.GetDashboardInsightsUseCase;
 import br.com.ecofy.ms_insights.core.port.in.ListInsightsUseCase;
 import br.com.ecofy.ms_insights.core.port.out.LoadGoalsPort;
 import br.com.ecofy.ms_insights.core.port.out.LoadInsightsPort;
+import br.com.ecofy.ms_insights.core.port.out.LoadMetricSnapshotsPort;
 import br.com.ecofy.ms_insights.core.port.out.PageResult;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +18,6 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -28,14 +29,17 @@ public class DashboardInsightsService implements
         ListInsightsUseCase {
 
     private static final int DEFAULT_INSIGHTS_LIMIT = 20;
+    private static final int DEFAULT_METRICS_LIMIT = 20;
 
     private final LoadInsightsPort loadInsightsPort;
+    private final LoadMetricSnapshotsPort loadMetricSnapshotsPort;
     private final LoadGoalsPort loadGoalsPort;
     private final CacheManager cacheManager;
     private final MeterRegistry meterRegistry;
 
     public DashboardInsightsService(
             LoadInsightsPort loadInsightsPort,
+            LoadMetricSnapshotsPort loadMetricSnapshotsPort,
             LoadGoalsPort loadGoalsPort,
             CacheManager cacheManager,
             MeterRegistry meterRegistry
@@ -43,6 +47,10 @@ public class DashboardInsightsService implements
         this.loadInsightsPort = Objects.requireNonNull(
                 loadInsightsPort,
                 "loadInsightsPort must not be null"
+        );
+        this.loadMetricSnapshotsPort = Objects.requireNonNull(
+                loadMetricSnapshotsPort,
+                "loadMetricSnapshotsPort must not be null"
         );
         this.loadGoalsPort = Objects.requireNonNull(
                 loadGoalsPort,
@@ -97,9 +105,22 @@ public class DashboardInsightsService implements
                 .map(GoalService::toResult)
                 .toList();
 
+        var metrics = loadMetricSnapshotsPort
+                .findRecentForUser(userId, DEFAULT_METRICS_LIMIT)
+                .stream()
+                .map(snapshot -> new MetricSnapshotResult(
+                        snapshot.getId(),
+                        snapshot.getUserId().value(),
+                        snapshot.getMetricType(),
+                        snapshot.getValue().cents(),
+                        snapshot.getValue().currency(),
+                        snapshot.getCreatedAt()
+                ))
+                .toList();
+
         InsightsBundleResult result = new InsightsBundleResult(
                 insights,
-                List.of(),
+                metrics,
                 goals
         );
 

@@ -18,6 +18,7 @@ services:
     image: ecofy/ms-notification:local
     container_name: ecofy-ms-notification
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       NTF_SECURITY_PERMIT_ALL: ${NTF_SECURITY_PERMIT_ALL:-true}

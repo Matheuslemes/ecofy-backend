@@ -18,6 +18,7 @@ services:
     image: ecofy/ms-categorization:local
     container_name: ecofy-ms-categorization
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       CAT_SECURITY_PERMIT_ALL: ${CAT_SECURITY_PERMIT_ALL:-true}
