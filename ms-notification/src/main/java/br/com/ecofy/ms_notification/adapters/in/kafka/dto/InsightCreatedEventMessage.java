@@ -5,15 +5,10 @@ import java.util.UUID;
 public record InsightCreatedEventMessage(
 
         UUID userId,
-
         UUID insightId,
-
         String insightType,
-
         String periodStart,
-
         String periodEnd,
-
         MessageMetadata metadata
 
 ) { }
