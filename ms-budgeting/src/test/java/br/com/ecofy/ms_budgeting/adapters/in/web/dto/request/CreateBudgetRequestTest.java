@@ -8,7 +8,6 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +26,9 @@ class CreateBudgetRequestTest {
     private static final LocalDate PERIOD_START = LocalDate.of(2026, 6, 1);
     private static final LocalDate PERIOD_END = LocalDate.of(2026, 6, 30);
 
+    // COMP-011: limite em centavos inteiros.
+    private static final long LIMIT_CENTS = 100050L; // 1000.50
+
     private final Validator validator = validator();
 
     @Test
@@ -40,7 +42,7 @@ class CreateBudgetRequestTest {
                 periodType,
                 PERIOD_START,
                 PERIOD_END,
-                BigDecimal.valueOf(1000.50),
+                LIMIT_CENTS,
                 "BRL",
                 status
         );
@@ -50,7 +52,7 @@ class CreateBudgetRequestTest {
         assertEquals(periodType, request.periodType());
         assertEquals(PERIOD_START, request.periodStart());
         assertEquals(PERIOD_END, request.periodEnd());
-        assertEquals(BigDecimal.valueOf(1000.50), request.limitAmount());
+        assertEquals(LIMIT_CENTS, request.limitAmountCents());
         assertEquals("BRL", request.currency());
         assertEquals(status, request.status());
     }
@@ -74,7 +76,7 @@ class CreateBudgetRequestTest {
                 anyBudgetPeriodType(),
                 PERIOD_START,
                 PERIOD_END,
-                BigDecimal.valueOf(0.01),
+                1L, // 1 centavo (mínimo)
                 "BRL",
                 anyBudgetStatus()
         );
@@ -109,7 +111,7 @@ class CreateBudgetRequestTest {
         assertTrue(fields.contains("periodType"));
         assertTrue(fields.contains("periodStart"));
         assertTrue(fields.contains("periodEnd"));
-        assertTrue(fields.contains("limitAmount"));
+        assertTrue(fields.contains("limitAmountCents"));
         assertTrue(fields.contains("currency"));
 
         assertFalse(fields.contains("status"));
@@ -123,7 +125,7 @@ class CreateBudgetRequestTest {
                 anyBudgetPeriodType(),
                 PERIOD_START,
                 PERIOD_END,
-                BigDecimal.ZERO,
+                0L,
                 "BRL",
                 anyBudgetStatus()
         );
@@ -134,7 +136,7 @@ class CreateBudgetRequestTest {
         Set<String> fields = propertyNames(violations);
 
         assertEquals(1, violations.size());
-        assertTrue(fields.contains("limitAmount"));
+        assertTrue(fields.contains("limitAmountCents"));
     }
 
     @Test
@@ -145,7 +147,7 @@ class CreateBudgetRequestTest {
                 anyBudgetPeriodType(),
                 PERIOD_START,
                 PERIOD_END,
-                BigDecimal.valueOf(100),
+                10000L,
                 "   ",
                 anyBudgetStatus()
         );
@@ -165,37 +167,14 @@ class CreateBudgetRequestTest {
         BudgetStatus status = anyBudgetStatus();
 
         CreateBudgetRequest request = new CreateBudgetRequest(
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                BigDecimal.valueOf(500),
-                "BRL",
-                status
-        );
+                USER_ID, CATEGORY_ID, periodType, PERIOD_START, PERIOD_END, 50000L, "BRL", status);
 
         CreateBudgetRequest sameRequest = new CreateBudgetRequest(
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                BigDecimal.valueOf(500),
-                "BRL",
-                status
-        );
+                USER_ID, CATEGORY_ID, periodType, PERIOD_START, PERIOD_END, 50000L, "BRL", status);
 
         CreateBudgetRequest differentRequest = new CreateBudgetRequest(
                 UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc"),
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                BigDecimal.valueOf(500),
-                "BRL",
-                status
-        );
+                CATEGORY_ID, periodType, PERIOD_START, PERIOD_END, 50000L, "BRL", status);
 
         assertEquals(request, request);
         assertEquals(request, sameRequest);
@@ -210,26 +189,10 @@ class CreateBudgetRequestTest {
         BudgetStatus status = anyBudgetStatus();
 
         CreateBudgetRequest request = new CreateBudgetRequest(
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                BigDecimal.valueOf(500),
-                "BRL",
-                status
-        );
+                USER_ID, CATEGORY_ID, periodType, PERIOD_START, PERIOD_END, 50000L, "BRL", status);
 
         CreateBudgetRequest sameRequest = new CreateBudgetRequest(
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                BigDecimal.valueOf(500),
-                "BRL",
-                status
-        );
+                USER_ID, CATEGORY_ID, periodType, PERIOD_START, PERIOD_END, 50000L, "BRL", status);
 
         assertEquals(request, sameRequest);
         assertEquals(request.hashCode(), sameRequest.hashCode());
@@ -241,15 +204,7 @@ class CreateBudgetRequestTest {
         BudgetStatus status = anyBudgetStatus();
 
         CreateBudgetRequest request = new CreateBudgetRequest(
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                BigDecimal.valueOf(500),
-                "BRL",
-                status
-        );
+                USER_ID, CATEGORY_ID, periodType, PERIOD_START, PERIOD_END, 50000L, "BRL", status);
 
         String result = request.toString();
 
@@ -259,7 +214,7 @@ class CreateBudgetRequestTest {
         assertTrue(result.contains("periodType=" + periodType));
         assertTrue(result.contains("periodStart=" + PERIOD_START));
         assertTrue(result.contains("periodEnd=" + PERIOD_END));
-        assertTrue(result.contains("limitAmount=500"));
+        assertTrue(result.contains("limitAmountCents=50000"));
         assertTrue(result.contains("currency=BRL"));
         assertTrue(result.contains("status=" + status));
     }
@@ -271,7 +226,7 @@ class CreateBudgetRequestTest {
                 anyBudgetPeriodType(),
                 PERIOD_START,
                 PERIOD_END,
-                BigDecimal.valueOf(100),
+                10000L,
                 "BRL",
                 status
         );

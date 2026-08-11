@@ -1,10 +1,10 @@
 package br.com.ecofy.auth.adapters.in.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -134,7 +134,7 @@ class RegistrationControllerTest {
         assertEquals("Matheus", command.firstName());
         assertEquals("Lemes", command.lastName());
         assertEquals("pt-BR", command.locale());
-        assertFalse(command.autoConfirmEmail());
+        assertTrue(command.autoConfirmEmail());
         assertEquals(List.of("ROLE_USER"), command.roles());
 
         verifyNoInteractions(confirmEmailUseCase);
@@ -184,7 +184,7 @@ class RegistrationControllerTest {
         assertEquals("Matheus", command.firstName());
         assertEquals("Lemes", command.lastName());
         assertEquals("en-US", command.locale());
-        assertFalse(command.autoConfirmEmail());
+        assertTrue(command.autoConfirmEmail());
         assertEquals(List.of("ROLE_USER"), command.roles());
 
         verifyNoInteractions(confirmEmailUseCase);

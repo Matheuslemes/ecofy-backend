@@ -30,7 +30,7 @@ class RestExceptionHandlerAppExceptionTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, resp.getStatusCode());
         assertEquals(400, resp.getBody().status());
-        assertEquals("BUDGETING_VALIDATION_ERROR", resp.getBody().details().get("code"));
+        assertEquals("BUDGETING_VALIDATION_ERROR", resp.getBody().errorCode());
     }
 
     @Test
@@ -48,6 +48,6 @@ class RestExceptionHandlerAppExceptionTest {
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, resp.getStatusCode());
         assertEquals("Processing error", resp.getBody().message());
-        assertEquals("BUDGETING_PROCESSING_ERROR", resp.getBody().details().get("code"));
+        assertEquals("BUDGETING_PROCESSING_ERROR", resp.getBody().errorCode());
     }
 }

@@ -28,28 +28,30 @@ class RestExceptionHandlerTest {
         ResponseEntity<ApiErrorResponse> resp = handler.generic(ex, req());
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(resp.getBody().message()).isEqualTo("Unexpected error");
+        assertThat(resp.getBody().message()).isEqualTo("Ocorreu um erro interno ao processar a solicitação.");
         assertThat(resp.getBody().message()).doesNotContain("postgres", "jdbc", "secret");
+        assertThat(resp.getBody().errorCode()).isEqualTo("INTERNAL_SERVER_ERROR");
     }
 
     @Test
     void goalNotFound_shouldReturn404() {
         var resp = handler.goalNotFound(new GoalNotFoundException("nope"), req());
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(resp.getBody().details()).containsEntry("reason", "GOAL_NOT_FOUND");
+        assertThat(resp.getBody().errorCode()).isEqualTo("GOAL_NOT_FOUND");
     }
 
     @Test
     void idempotency_shouldReturn409() {
         var resp = handler.idem(new IdempotencyViolationException("dup"), req());
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(resp.getBody().errorCode()).isEqualTo("IDEMPOTENCY_VIOLATION");
     }
 
     @Test
     void illegalArgument_shouldReturn400() {
         var resp = handler.illegalArgument(new IllegalArgumentException("end must be >= start"), req());
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(resp.getBody().details()).containsEntry("reason", "INVALID_ARGUMENT");
+        assertThat(resp.getBody().errorCode()).isEqualTo("INVALID_ARGUMENT");
     }
 
     @Test
@@ -57,6 +59,7 @@ class RestExceptionHandlerTest {
         var resp = handler.externalUnavailable(
                 new ExternalDataUnavailableException("budgeting", "down", new RuntimeException()), req());
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(resp.getBody().errorCode()).isEqualTo("EXTERNAL_DATA_UNAVAILABLE");
         assertThat(resp.getBody().details()).containsEntry("source", "budgeting");
     }
 }

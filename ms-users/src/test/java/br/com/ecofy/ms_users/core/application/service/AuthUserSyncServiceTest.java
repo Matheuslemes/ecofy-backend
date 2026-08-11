@@ -88,4 +88,24 @@ class AuthUserSyncServiceTest {
         assertEquals("en-US", captor.getValue().getLocale());
         assertNotNull(result.id());
     }
+
+    @Test
+    void upsert_shouldDeriveProfileIdFromAuthId_whenAuthIdIsUuid() {
+        var service = service();
+        UUID authId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+
+        var command = new UpsertUserFromAuthUseCase.Command(
+                authId.toString(), "user@ecofy.com", "First", "Last", null, true, "ACTIVE", "en-US");
+
+        when(loadPort.findByExternalAuthId(any(ExternalAuthId.class))).thenReturn(Optional.empty());
+        when(savePort.save(any(EcoUserProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserProfileResult result = service.upsert(command);
+
+        ArgumentCaptor<EcoUserProfile> captor = ArgumentCaptor.forClass(EcoUserProfile.class);
+        verify(savePort, times(1)).save(captor.capture());
+        assertEquals(authId, captor.getValue().getId().value(), "profile.id deve ser igual ao id de auth");
+        assertEquals(authId.toString(), captor.getValue().getExternalAuthId().value());
+        assertEquals(authId, result.id(), "o id retornado deve ser o id de auth");
+    }
 }

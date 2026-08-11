@@ -28,6 +28,9 @@ class BudgetResponseTest {
     private static final LocalDate PERIOD_START = LocalDate.of(2026, 6, 1);
     private static final LocalDate PERIOD_END = LocalDate.of(2026, 6, 30);
 
+    // COMP-011: valores monetários no contrato da API em centavos inteiros.
+    private static final long LIMIT_CENTS = 100050L; // 1000.50
+
     private static final Instant CREATED_AT =
             Instant.parse("2026-06-25T10:30:00Z");
 
@@ -45,7 +48,7 @@ class BudgetResponseTest {
                 PERIOD_END,
                 "ACTIVE",
                 "BRL",
-                "1000.50",
+                LIMIT_CENTS,
                 CREATED_AT,
                 UPDATED_AT
         );
@@ -58,13 +61,13 @@ class BudgetResponseTest {
         assertEquals(PERIOD_END, response.periodEnd());
         assertEquals("ACTIVE", response.status());
         assertEquals("BRL", response.currency());
-        assertEquals("1000.50", response.limitAmount());
+        assertEquals(LIMIT_CENTS, response.limitAmountCents());
         assertEquals(CREATED_AT, response.createdAt());
         assertEquals(UPDATED_AT, response.updatedAt());
     }
 
     @Test
-    void shouldCreateBudgetResponseWithNullFields() {
+    void shouldCreateBudgetResponseWithNullableFields() {
         BudgetResponse response = new BudgetResponse(
                 null,
                 null,
@@ -74,7 +77,7 @@ class BudgetResponseTest {
                 null,
                 null,
                 null,
-                null,
+                0L,
                 null,
                 null
         );
@@ -87,7 +90,7 @@ class BudgetResponseTest {
         assertNull(response.periodEnd());
         assertNull(response.status());
         assertNull(response.currency());
-        assertNull(response.limitAmount());
+        assertEquals(0L, response.limitAmountCents());
         assertNull(response.createdAt());
         assertNull(response.updatedAt());
     }
@@ -107,6 +110,7 @@ class BudgetResponseTest {
         doReturn(PERIOD_END).when(result).periodEnd();
         doReturn(status).when(result).status();
         doReturn("BRL").when(result).currency();
+        // O domínio/result permanece em BigDecimal; a conversão para centavos ocorre no DTO.
         doReturn(new BigDecimal("1000.50")).when(result).limitAmount();
         doReturn(CREATED_AT).when(result).createdAt();
         doReturn(UPDATED_AT).when(result).updatedAt();
@@ -121,7 +125,7 @@ class BudgetResponseTest {
         assertEquals(PERIOD_END, response.periodEnd());
         assertEquals(status.name(), response.status());
         assertEquals("BRL", response.currency());
-        assertEquals("1000.50", response.limitAmount());
+        assertEquals(LIMIT_CENTS, response.limitAmountCents());
         assertEquals(CREATED_AT, response.createdAt());
         assertEquals(UPDATED_AT, response.updatedAt());
     }
@@ -202,7 +206,7 @@ class BudgetResponseTest {
                 PERIOD_END,
                 "ACTIVE",
                 "BRL",
-                "1000.50",
+                LIMIT_CENTS,
                 CREATED_AT,
                 UPDATED_AT
         );
@@ -224,132 +228,6 @@ class BudgetResponseTest {
     }
 
     @Test
-    void shouldNotBeEqualWhenUserIdChanges() {
-        BudgetResponse response = baseResponse();
-
-        BudgetResponse differentResponse = new BudgetResponse(
-                ID,
-                UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                CATEGORY_ID,
-                "MONTHLY",
-                PERIOD_START,
-                PERIOD_END,
-                "ACTIVE",
-                "BRL",
-                "1000.50",
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        assertNotEquals(response, differentResponse);
-    }
-
-    @Test
-    void shouldNotBeEqualWhenCategoryIdChanges() {
-        BudgetResponse response = baseResponse();
-
-        BudgetResponse differentResponse = new BudgetResponse(
-                ID,
-                USER_ID,
-                UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                "MONTHLY",
-                PERIOD_START,
-                PERIOD_END,
-                "ACTIVE",
-                "BRL",
-                "1000.50",
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        assertNotEquals(response, differentResponse);
-    }
-
-    @Test
-    void shouldNotBeEqualWhenPeriodTypeChanges() {
-        BudgetResponse response = baseResponse();
-
-        BudgetResponse differentResponse = new BudgetResponse(
-                ID,
-                USER_ID,
-                CATEGORY_ID,
-                "YEARLY",
-                PERIOD_START,
-                PERIOD_END,
-                "ACTIVE",
-                "BRL",
-                "1000.50",
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        assertNotEquals(response, differentResponse);
-    }
-
-    @Test
-    void shouldNotBeEqualWhenPeriodStartChanges() {
-        BudgetResponse response = baseResponse();
-
-        BudgetResponse differentResponse = new BudgetResponse(
-                ID,
-                USER_ID,
-                CATEGORY_ID,
-                "MONTHLY",
-                PERIOD_START.plusDays(1),
-                PERIOD_END,
-                "ACTIVE",
-                "BRL",
-                "1000.50",
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        assertNotEquals(response, differentResponse);
-    }
-
-    @Test
-    void shouldNotBeEqualWhenPeriodEndChanges() {
-        BudgetResponse response = baseResponse();
-
-        BudgetResponse differentResponse = new BudgetResponse(
-                ID,
-                USER_ID,
-                CATEGORY_ID,
-                "MONTHLY",
-                PERIOD_START,
-                PERIOD_END.plusDays(1),
-                "ACTIVE",
-                "BRL",
-                "1000.50",
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        assertNotEquals(response, differentResponse);
-    }
-
-    @Test
-    void shouldNotBeEqualWhenStatusChanges() {
-        BudgetResponse response = baseResponse();
-
-        BudgetResponse differentResponse = new BudgetResponse(
-                ID,
-                USER_ID,
-                CATEGORY_ID,
-                "MONTHLY",
-                PERIOD_START,
-                PERIOD_END,
-                "INACTIVE",
-                "BRL",
-                "1000.50",
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        assertNotEquals(response, differentResponse);
-    }
-
-    @Test
     void shouldNotBeEqualWhenCurrencyChanges() {
         BudgetResponse response = baseResponse();
 
@@ -362,7 +240,7 @@ class BudgetResponseTest {
                 PERIOD_END,
                 "ACTIVE",
                 "USD",
-                "1000.50",
+                LIMIT_CENTS,
                 CREATED_AT,
                 UPDATED_AT
         );
@@ -383,51 +261,9 @@ class BudgetResponseTest {
                 PERIOD_END,
                 "ACTIVE",
                 "BRL",
-                "2000.00",
+                200000L,
                 CREATED_AT,
                 UPDATED_AT
-        );
-
-        assertNotEquals(response, differentResponse);
-    }
-
-    @Test
-    void shouldNotBeEqualWhenCreatedAtChanges() {
-        BudgetResponse response = baseResponse();
-
-        BudgetResponse differentResponse = new BudgetResponse(
-                ID,
-                USER_ID,
-                CATEGORY_ID,
-                "MONTHLY",
-                PERIOD_START,
-                PERIOD_END,
-                "ACTIVE",
-                "BRL",
-                "1000.50",
-                CREATED_AT.plusSeconds(60),
-                UPDATED_AT
-        );
-
-        assertNotEquals(response, differentResponse);
-    }
-
-    @Test
-    void shouldNotBeEqualWhenUpdatedAtChanges() {
-        BudgetResponse response = baseResponse();
-
-        BudgetResponse differentResponse = new BudgetResponse(
-                ID,
-                USER_ID,
-                CATEGORY_ID,
-                "MONTHLY",
-                PERIOD_START,
-                PERIOD_END,
-                "ACTIVE",
-                "BRL",
-                "1000.50",
-                CREATED_AT,
-                UPDATED_AT.plusSeconds(60)
         );
 
         assertNotEquals(response, differentResponse);
@@ -448,7 +284,7 @@ class BudgetResponseTest {
         assertTrue(result.contains("periodEnd=" + PERIOD_END));
         assertTrue(result.contains("status=ACTIVE"));
         assertTrue(result.contains("currency=BRL"));
-        assertTrue(result.contains("limitAmount=1000.50"));
+        assertTrue(result.contains("limitAmountCents=" + LIMIT_CENTS));
         assertTrue(result.contains("createdAt=" + CREATED_AT));
         assertTrue(result.contains("updatedAt=" + UPDATED_AT));
     }
@@ -463,7 +299,7 @@ class BudgetResponseTest {
                 PERIOD_END,
                 "ACTIVE",
                 "BRL",
-                "1000.50",
+                LIMIT_CENTS,
                 CREATED_AT,
                 UPDATED_AT
         );

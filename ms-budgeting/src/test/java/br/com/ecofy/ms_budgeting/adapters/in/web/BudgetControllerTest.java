@@ -4,68 +4,62 @@ import br.com.ecofy.ms_budgeting.adapters.in.web.dto.request.CreateBudgetRequest
 import br.com.ecofy.ms_budgeting.adapters.in.web.dto.request.UpdateBudgetRequest;
 import br.com.ecofy.ms_budgeting.adapters.in.web.dto.response.BudgetOverviewResponse;
 import br.com.ecofy.ms_budgeting.adapters.in.web.dto.response.BudgetResponse;
+import br.com.ecofy.ms_budgeting.adapters.in.web.security.AuthenticatedUser;
+import br.com.ecofy.ms_budgeting.adapters.in.web.support.MoneyCents;
+import br.com.ecofy.ms_budgeting.config.BudgetingProperties;
 import br.com.ecofy.ms_budgeting.core.application.command.CreateBudgetCommand;
 import br.com.ecofy.ms_budgeting.core.application.command.DeleteBudgetCommand;
 import br.com.ecofy.ms_budgeting.core.application.command.UpdateBudgetCommand;
-import br.com.ecofy.ms_budgeting.core.application.result.BudgetOverviewResult;
+import br.com.ecofy.ms_budgeting.core.application.exception.PaginationParameterInvalidException;
 import br.com.ecofy.ms_budgeting.core.application.result.BudgetResult;
-import br.com.ecofy.ms_budgeting.core.domain.enums.BudgetPeriodType;
-import br.com.ecofy.ms_budgeting.core.domain.enums.BudgetStatus;
+import br.com.ecofy.ms_budgeting.core.domain.exception.BudgetAccessForbiddenException;
 import br.com.ecofy.ms_budgeting.core.port.in.CreateBudgetUseCase;
 import br.com.ecofy.ms_budgeting.core.port.in.DeleteBudgetUseCase;
 import br.com.ecofy.ms_budgeting.core.port.in.GetBudgetOverviewUseCase;
 import br.com.ecofy.ms_budgeting.core.port.in.GetBudgetUseCase;
 import br.com.ecofy.ms_budgeting.core.port.in.ListBudgetsUseCase;
 import br.com.ecofy.ms_budgeting.core.port.in.UpdateBudgetUseCase;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import br.com.ecofy.ms_budgeting.core.port.out.PageResult;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.lang.reflect.Method;
-import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class BudgetControllerTest {
 
-    private static final UUID BUDGET_ID =
-            UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-
-    private static final UUID SECOND_BUDGET_ID =
-            UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
-
-    private static final UUID USER_ID =
-            UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
-
-    private static final UUID CATEGORY_ID =
-            UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
-
-    private static final LocalDate PERIOD_START = LocalDate.of(2026, 6, 1);
-    private static final LocalDate PERIOD_END = LocalDate.of(2026, 6, 30);
-
-    private static final Instant CREATED_AT =
-            Instant.parse("2026-06-25T10:30:00Z");
-
-    private static final Instant UPDATED_AT =
-            Instant.parse("2026-06-25T11:30:00Z");
-
-    private static final BigDecimal LIMIT_AMOUNT = new BigDecimal("1000.50");
+    private static final UUID OWNER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID OTHER_OWNER_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID BUDGET_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    private static final UUID CATEGORY_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    private static final String OWNER_CLAIM = "sub";
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
 
     @Mock
     private CreateBudgetUseCase createBudgetUseCase;
@@ -85,470 +79,466 @@ class BudgetControllerTest {
     @Mock
     private GetBudgetOverviewUseCase getBudgetOverviewUseCase;
 
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+    private BudgetingProperties props;
+
+    @Mock
+    private MeterRegistry meterRegistry;
+
+    @InjectMocks
     private BudgetController controller;
 
-    @BeforeEach
-    void setUp() {
-        controller = new BudgetController(
-                createBudgetUseCase,
-                updateBudgetUseCase,
-                deleteBudgetUseCase,
-                listBudgetsUseCase,
-                getBudgetUseCase,
-                getBudgetOverviewUseCase
-        );
-    }
-
-    @AfterEach
-    void tearDown() {
-        RequestContextHolder.resetRequestAttributes();
-    }
-
     @Test
-    void shouldCreateBudgetWithIdempotencyKey() {
-        bindCurrentRequest("POST", "/api/budgeting/v1/budgets");
-
-        BudgetPeriodType periodType = anyBudgetPeriodType();
-        BudgetStatus status = anyBudgetStatus();
-
-        CreateBudgetRequest request = new CreateBudgetRequest(
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                LIMIT_AMOUNT,
-                "BRL",
-                status
-        );
-
-        BudgetResult createdResult = budgetResult(
-                BUDGET_ID,
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                status,
-                "BRL",
-                LIMIT_AMOUNT,
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        when(createBudgetUseCase.create(any(CreateBudgetCommand.class), eq("idem-key-001")))
-                .thenReturn(createdResult);
-
-        ResponseEntity<BudgetResponse> response =
-                controller.create("idem-key-001", request);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getHeaders().getLocation());
-        assertTrue(response.getHeaders().getLocation().toString().endsWith("/api/budgeting/v1/budgets/" + BUDGET_ID));
-
-        BudgetResponse body = response.getBody();
-
-        assertNotNull(body);
-        assertBudgetResponse(body, BUDGET_ID, USER_ID, CATEGORY_ID, periodType, status, LIMIT_AMOUNT);
-
-        ArgumentCaptor<CreateBudgetCommand> commandCaptor =
-                ArgumentCaptor.forClass(CreateBudgetCommand.class);
-
-        verify(createBudgetUseCase).create(commandCaptor.capture(), eq("idem-key-001"));
-
-        CreateBudgetCommand command = commandCaptor.getValue();
-
-        assertEquals(USER_ID, readAny(command, "userId"));
-        assertEquals(CATEGORY_ID, readAny(command, "categoryId"));
-        assertEquals(periodType, readAny(command, "periodType"));
-        assertEquals(PERIOD_START, readAny(command, "periodStart"));
-        assertEquals(PERIOD_END, readAny(command, "periodEnd"));
-        assertEquals(LIMIT_AMOUNT, readAny(command, "limitAmount"));
-        assertEquals("BRL", readAny(command, "currency"));
-        assertEquals(status, readAny(command, "status"));
-    }
-
-    @Test
-    void shouldCreateBudgetWithoutIdempotencyKey() {
-        bindCurrentRequest("POST", "/api/budgeting/v1/budgets");
-
-        BudgetPeriodType periodType = anyBudgetPeriodType();
-        BudgetStatus status = anyBudgetStatus();
-
-        CreateBudgetRequest request = new CreateBudgetRequest(
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                LIMIT_AMOUNT,
-                "BRL",
-                status
-        );
-
-        BudgetResult createdResult = budgetResult(
-                BUDGET_ID,
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                status,
-                "BRL",
-                LIMIT_AMOUNT,
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        when(createBudgetUseCase.create(any(CreateBudgetCommand.class), isNull()))
-                .thenReturn(createdResult);
-
-        ResponseEntity<BudgetResponse> response =
-                controller.create(null, request);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(BUDGET_ID, response.getBody().id());
-
-        verify(createBudgetUseCase).create(any(CreateBudgetCommand.class), isNull());
-    }
-
-    @Test
-    void shouldUpdateBudgetWithIdempotencyKey() {
-        BudgetStatus status = anyBudgetStatus();
-
-        UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("1500.75"),
-                "USD",
-                status
-        );
-
-        BudgetResult updatedResult = budgetResult(
-                BUDGET_ID,
-                USER_ID,
-                CATEGORY_ID,
-                anyBudgetPeriodType(),
-                PERIOD_START,
-                PERIOD_END,
-                status,
-                "USD",
-                new BigDecimal("1500.75"),
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        when(updateBudgetUseCase.update(any(UpdateBudgetCommand.class), eq("idem-key-update")))
-                .thenReturn(updatedResult);
-
-        ResponseEntity<BudgetResponse> response =
-                controller.update("idem-key-update", BUDGET_ID, request);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-
-        BudgetResponse body = response.getBody();
-
-        assertNotNull(body);
-        assertEquals(BUDGET_ID, body.id());
-        assertEquals("USD", body.currency());
-        assertEquals("1500.75", body.limitAmount());
-        assertEquals(status.name(), body.status());
-
-        ArgumentCaptor<UpdateBudgetCommand> commandCaptor =
-                ArgumentCaptor.forClass(UpdateBudgetCommand.class);
-
-        verify(updateBudgetUseCase).update(commandCaptor.capture(), eq("idem-key-update"));
-
-        UpdateBudgetCommand command = commandCaptor.getValue();
-
-        assertEquals(BUDGET_ID, readAny(command, "id", "budgetId"));
-        assertEquals(new BigDecimal("1500.75"), readAny(command, "newLimitAmount", "limitAmount"));
-        assertEquals("USD", readAny(command, "currency"));
-        assertEquals(status, readAny(command, "status"));
-    }
-
-    @Test
-    void shouldUpdateBudgetWithoutIdempotencyKey() {
-        BudgetStatus status = anyBudgetStatus();
-
-        UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("2000.00"),
-                "BRL",
-                status
-        );
-
-        BudgetResult updatedResult = budgetResult(
-                BUDGET_ID,
-                USER_ID,
-                CATEGORY_ID,
-                anyBudgetPeriodType(),
-                PERIOD_START,
-                PERIOD_END,
-                status,
-                "BRL",
-                new BigDecimal("2000.00"),
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        when(updateBudgetUseCase.update(any(UpdateBudgetCommand.class), isNull()))
-                .thenReturn(updatedResult);
-
-        ResponseEntity<BudgetResponse> response =
-                controller.update(null, BUDGET_ID, request);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("2000.00", response.getBody().limitAmount());
-
-        verify(updateBudgetUseCase).update(any(UpdateBudgetCommand.class), isNull());
-    }
-
-    @Test
-    void shouldDeleteBudgetWithIdempotencyKey() {
-        ResponseEntity<Void> response =
-                controller.delete("idem-key-delete", BUDGET_ID);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        assertNull(response.getBody());
-
-        ArgumentCaptor<DeleteBudgetCommand> commandCaptor =
-                ArgumentCaptor.forClass(DeleteBudgetCommand.class);
-
-        verify(deleteBudgetUseCase).delete(commandCaptor.capture(), eq("idem-key-delete"));
-
-        DeleteBudgetCommand command = commandCaptor.getValue();
-
-        assertEquals(BUDGET_ID, readAny(command, "id", "budgetId"));
-    }
-
-    @Test
-    void shouldDeleteBudgetWithoutIdempotencyKey() {
-        ResponseEntity<Void> response =
-                controller.delete(null, BUDGET_ID);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        assertNull(response.getBody());
-
-        verify(deleteBudgetUseCase).delete(any(DeleteBudgetCommand.class), isNull());
-    }
-
-    @Test
-    void shouldListBudgetsByUser() {
-        BudgetPeriodType periodType = anyBudgetPeriodType();
-        BudgetStatus status = anyBudgetStatus();
-
-        BudgetResult firstBudget = budgetResult(
-                BUDGET_ID,
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                status,
-                "BRL",
-                new BigDecimal("1000.50"),
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        BudgetResult secondBudget = budgetResult(
-                SECOND_BUDGET_ID,
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START.plusMonths(1),
-                PERIOD_END.plusMonths(1),
-                status,
-                "BRL",
-                new BigDecimal("2000.00"),
-                CREATED_AT.plusSeconds(60),
-                UPDATED_AT.plusSeconds(60)
-        );
-
-        when(listBudgetsUseCase.listByUser(USER_ID))
-                .thenReturn(List.of(firstBudget, secondBudget));
-
-        ResponseEntity<List<BudgetResponse>> response =
-                controller.listByUser(USER_ID);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-
-        List<BudgetResponse> body = response.getBody();
-
-        assertNotNull(body);
-        assertEquals(2, body.size());
-
-        assertEquals(BUDGET_ID, body.get(0).id());
-        assertEquals(SECOND_BUDGET_ID, body.get(1).id());
-        assertEquals(USER_ID, body.get(0).userId());
-        assertEquals(USER_ID, body.get(1).userId());
-
-        verify(listBudgetsUseCase).listByUser(USER_ID);
-    }
-
-    @Test
-    void shouldGetBudgetById() {
-        BudgetPeriodType periodType = anyBudgetPeriodType();
-        BudgetStatus status = anyBudgetStatus();
-
-        BudgetResult budget = budgetResult(
-                BUDGET_ID,
-                USER_ID,
-                CATEGORY_ID,
-                periodType,
-                PERIOD_START,
-                PERIOD_END,
-                status,
-                "BRL",
-                LIMIT_AMOUNT,
-                CREATED_AT,
-                UPDATED_AT
-        );
-
-        when(getBudgetUseCase.get(BUDGET_ID))
-                .thenReturn(budget);
-
-        ResponseEntity<BudgetResponse> response =
-                controller.get(BUDGET_ID);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-
-        BudgetResponse body = response.getBody();
-
-        assertNotNull(body);
-        assertBudgetResponse(body, BUDGET_ID, USER_ID, CATEGORY_ID, periodType, status, LIMIT_AMOUNT);
-
-        verify(getBudgetUseCase).get(BUDGET_ID);
-    }
-
-    @Test
-    void shouldReturnBudgetOverviewByUser() {
-        List<?> consumptions = List.of("consumption-001", "consumption-002");
-        List<?> alerts = List.of("alert-001", "alert-002");
-
-        BudgetOverviewResult overviewResult = mock(BudgetOverviewResult.class);
-
-        doReturn(USER_ID).when(overviewResult).userId();
-        doReturn(consumptions).when(overviewResult).consumptions();
-        doReturn(alerts).when(overviewResult).alerts();
-
-        when(getBudgetOverviewUseCase.overview(USER_ID))
-                .thenReturn(overviewResult);
-
-        ResponseEntity<BudgetOverviewResponse> response =
-                controller.overview(USER_ID);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-
-        BudgetOverviewResponse body = response.getBody();
-
-        assertNotNull(body);
-        assertEquals(USER_ID, body.userId());
-        assertSame(consumptions, body.consumptions());
-        assertSame(alerts, body.alerts());
-
-        verify(getBudgetOverviewUseCase).overview(USER_ID);
-    }
-
-    private static BudgetResult budgetResult(
-            UUID id,
-            UUID userId,
-            UUID categoryId,
-            BudgetPeriodType periodType,
-            LocalDate periodStart,
-            LocalDate periodEnd,
-            BudgetStatus status,
-            String currency,
-            BigDecimal limitAmount,
-            Instant createdAt,
-            Instant updatedAt
-    ) {
-        BudgetResult result = mock(BudgetResult.class);
-
-        doReturn(id).when(result).id();
-        doReturn(userId).when(result).userId();
-        doReturn(categoryId).when(result).categoryId();
-        doReturn(periodType).when(result).periodType();
-        doReturn(periodStart).when(result).periodStart();
-        doReturn(periodEnd).when(result).periodEnd();
-        doReturn(status).when(result).status();
-        doReturn(currency).when(result).currency();
-        doReturn(limitAmount).when(result).limitAmount();
-        doReturn(createdAt).when(result).createdAt();
-        doReturn(updatedAt).when(result).updatedAt();
-
-        return result;
-    }
-
-    private static void assertBudgetResponse(
-            BudgetResponse response,
-            UUID expectedId,
-            UUID expectedUserId,
-            UUID expectedCategoryId,
-            BudgetPeriodType expectedPeriodType,
-            BudgetStatus expectedStatus,
-            BigDecimal expectedLimitAmount
-    ) {
-        assertEquals(expectedId, response.id());
-        assertEquals(expectedUserId, response.userId());
-        assertEquals(expectedCategoryId, response.categoryId());
-        assertEquals(expectedPeriodType.name(), response.periodType());
-        assertEquals(PERIOD_START, response.periodStart());
-        assertEquals(PERIOD_END, response.periodEnd());
-        assertEquals(expectedStatus.name(), response.status());
-        assertEquals("BRL", response.currency());
-        assertEquals(expectedLimitAmount.toPlainString(), response.limitAmount());
-        assertEquals(CREATED_AT, response.createdAt());
-        assertEquals(UPDATED_AT, response.updatedAt());
-    }
-
-    private static void bindCurrentRequest(String method, String requestUri) {
-        MockHttpServletRequest request = new MockHttpServletRequest(method, requestUri);
-        request.setScheme("http");
-        request.setServerName("localhost");
-        request.setServerPort(8080);
-        request.setContextPath("");
-
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-    }
-
-    private static Object readAny(Object target, String... methodNames) {
-        for (String methodName : methodNames) {
-            try {
-                Method method = target.getClass().getMethod(methodName);
-                return method.invoke(target);
-            } catch (NoSuchMethodException ignored) {
-                // tenta o próximo nome possível
-            } catch (Exception ex) {
-                throw new AssertionError("Failed to read method: " + methodName, ex);
-            }
+    @DisplayName("Deve criar orçamento e retornar status 201 com Location")
+    void shouldCreateBudgetAndReturnCreated() {
+        // Arrange
+        String idempotencyKey = "idem-create-123";
+        LocalDate start = LocalDate.of(2026, 8, 1);
+        LocalDate end = LocalDate.of(2026, 8, 31);
+        CreateBudgetRequest request = mock(CreateBudgetRequest.class);
+        BudgetResult created = mock(BudgetResult.class);
+        BudgetResponse expectedBody = mock(BudgetResponse.class);
+
+        when(request.categoryId()).thenReturn(CATEGORY_ID);
+        when(request.periodStart()).thenReturn(start);
+        when(request.periodEnd()).thenReturn(end);
+        when(request.limitAmountCents()).thenReturn(10_000L);
+        when(request.currency()).thenReturn("BRL");
+        when(created.id()).thenReturn(BUDGET_ID);
+        when(createBudgetUseCase.create(any(CreateBudgetCommand.class), eq(idempotencyKey))).thenReturn(created);
+
+        MockHttpServletRequest servletRequest = new MockHttpServletRequest(
+                "POST", "/api/budgeting/v1/budgets");
+        servletRequest.setScheme("http");
+        servletRequest.setServerName("localhost");
+        servletRequest.setServerPort(8080);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(servletRequest));
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner();
+             MockedStatic<BudgetResponse> responseFactory = mockStatic(BudgetResponse.class)) {
+            responseFactory.when(() -> BudgetResponse.from(created)).thenReturn(expectedBody);
+
+            // Act
+            var response = controller.create(idempotencyKey, request);
+
+            // Assert
+            ArgumentCaptor<CreateBudgetCommand> captor = ArgumentCaptor.forClass(CreateBudgetCommand.class);
+            verify(createBudgetUseCase).create(captor.capture(), eq(idempotencyKey));
+
+            CreateBudgetCommand command = captor.getValue();
+            assertThat(command.userId()).isEqualTo(OWNER_ID);
+            assertThat(command.categoryId()).isEqualTo(CATEGORY_ID);
+            assertThat(command.periodStart()).isEqualTo(start);
+            assertThat(command.periodEnd()).isEqualTo(end);
+            assertThat(command.limitAmount()).isEqualTo(MoneyCents.fromCents(10_000L));
+            assertThat(command.currency()).isEqualTo("BRL");
+            assertThat(response.getStatusCode().value()).isEqualTo(201);
+            assertThat(response.getBody()).isSameAs(expectedBody);
+            assertThat(response.getHeaders().getLocation()).isNotNull();
+            assertThat(response.getHeaders().getLocation().getPath()).endsWith("/" + BUDGET_ID);
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
         }
-
-        throw new AssertionError(
-                "None of the methods exist on "
-                        + target.getClass().getName()
-                        + ": "
-                        + String.join(", ", methodNames)
-        );
     }
 
-    private static BudgetPeriodType anyBudgetPeriodType() {
-        BudgetPeriodType[] values = BudgetPeriodType.values();
+    @Test
+    @DisplayName("Deve atualizar orçamento convertendo o novo limite informado em centavos")
+    void shouldUpdateBudgetWithNewLimit() {
+        // Arrange
+        String idempotencyKey = "idem-update-123";
+        UpdateBudgetRequest request = mock(UpdateBudgetRequest.class);
+        BudgetResult current = ownedBudget();
+        BudgetResult updated = mock(BudgetResult.class);
+        BudgetResponse expectedBody = mock(BudgetResponse.class);
 
-        if (values.length == 0) {
-            throw new IllegalStateException("BudgetPeriodType enum must have at least one value");
+        when(request.newLimitAmountCents()).thenReturn(25_000L);
+        when(request.currency()).thenReturn("BRL");
+        when(request.version()).thenReturn(3L);
+        when(getBudgetUseCase.get(BUDGET_ID)).thenReturn(current);
+        when(updateBudgetUseCase.update(any(UpdateBudgetCommand.class), eq(idempotencyKey))).thenReturn(updated);
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner();
+             MockedStatic<BudgetResponse> responseFactory = mockStatic(BudgetResponse.class)) {
+            responseFactory.when(() -> BudgetResponse.from(updated)).thenReturn(expectedBody);
+
+            // Act
+            var response = controller.update(idempotencyKey, BUDGET_ID, request);
+
+            // Assert
+            ArgumentCaptor<UpdateBudgetCommand> captor = ArgumentCaptor.forClass(UpdateBudgetCommand.class);
+            verify(updateBudgetUseCase).update(captor.capture(), eq(idempotencyKey));
+
+            UpdateBudgetCommand command = captor.getValue();
+            assertThat(command.budgetId()).isEqualTo(BUDGET_ID);
+            assertThat(command.newLimitAmount()).isEqualTo(MoneyCents.fromCents(25_000L));
+            assertThat(command.currency()).isEqualTo("BRL");
+            assertThat(command.expectedVersion()).isEqualTo(3L);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(response.getBody()).isSameAs(expectedBody);
         }
-
-        return values[0];
     }
 
-    private static BudgetStatus anyBudgetStatus() {
-        BudgetStatus[] values = BudgetStatus.values();
+    @Test
+    @DisplayName("Deve atualizar orçamento mantendo novo limite nulo quando não informado")
+    void shouldUpdateBudgetWithoutNewLimit() {
+        // Arrange
+        String idempotencyKey = "idem-update-456";
+        UpdateBudgetRequest request = mock(UpdateBudgetRequest.class);
+        BudgetResult current = ownedBudget();
+        BudgetResult updated = mock(BudgetResult.class);
+        BudgetResponse expectedBody = mock(BudgetResponse.class);
 
-        if (values.length == 0) {
-            throw new IllegalStateException("BudgetStatus enum must have at least one value");
+        when(request.currency()).thenReturn(null);
+        when(request.version()).thenReturn(4L);
+        when(getBudgetUseCase.get(BUDGET_ID)).thenReturn(current);
+        when(updateBudgetUseCase.update(any(UpdateBudgetCommand.class), eq(idempotencyKey))).thenReturn(updated);
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner();
+             MockedStatic<BudgetResponse> responseFactory = mockStatic(BudgetResponse.class)) {
+            responseFactory.when(() -> BudgetResponse.from(updated)).thenReturn(expectedBody);
+
+            // Act
+            var response = controller.update(idempotencyKey, BUDGET_ID, request);
+
+            // Assert
+            ArgumentCaptor<UpdateBudgetCommand> captor = ArgumentCaptor.forClass(UpdateBudgetCommand.class);
+            verify(updateBudgetUseCase).update(captor.capture(), eq(idempotencyKey));
+            assertThat(captor.getValue().newLimitAmount()).isNull();
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(response.getBody()).isSameAs(expectedBody);
         }
+    }
 
-        return values[0];
+    @Test
+    @DisplayName("Deve impedir atualização quando o orçamento pertencer a outro usuário")
+    void shouldRejectUpdateWhenBudgetBelongsToAnotherUser() {
+        // Arrange
+        String idempotencyKey = "idem-update-789";
+        UpdateBudgetRequest request = mock(UpdateBudgetRequest.class);
+        BudgetResult current = mock(BudgetResult.class);
+        Counter counter = mock(Counter.class);
+
+        when(current.userId()).thenReturn(OTHER_OWNER_ID);
+        when(getBudgetUseCase.get(BUDGET_ID)).thenReturn(current);
+        when(meterRegistry.counter(
+                "ecofy.budgeting.ownership.denied.total", "operation", "budget"))
+                .thenReturn(counter);
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            ThrowingCallable action = () -> controller.update(idempotencyKey, BUDGET_ID, request);
+
+            // Assert
+            assertThatThrownBy(action)
+                    .isInstanceOf(BudgetAccessForbiddenException.class);
+
+            verify(getBudgetUseCase).get(BUDGET_ID);
+            verify(counter).increment();
+            verifyNoInteractions(updateBudgetUseCase);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve remover orçamento pertencente ao usuário e retornar status 204")
+    void shouldDeleteOwnedBudget() {
+        // Arrange
+        String idempotencyKey = "idem-delete-123";
+        BudgetResult current = ownedBudget();
+        when(getBudgetUseCase.get(BUDGET_ID)).thenReturn(current);
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            var response = controller.delete(idempotencyKey, BUDGET_ID);
+
+            // Assert
+            ArgumentCaptor<DeleteBudgetCommand> captor = ArgumentCaptor.forClass(DeleteBudgetCommand.class);
+            verify(deleteBudgetUseCase).delete(captor.capture(), eq(idempotencyKey));
+            assertThat(captor.getValue().budgetId()).isEqualTo(BUDGET_ID);
+            assertThat(response.getStatusCode().value()).isEqualTo(204);
+            assertThat(response.getBody()).isNull();
+        }
+    }
+
+    @Test
+    @DisplayName("Deve listar usando paginação e ordenação padrão quando parâmetros forem nulos")
+    void shouldListWithDefaultPaginationAndSort() {
+        // Arrange
+        stubPaginationDefaults();
+        var expectedQuery = new ListBudgetsUseCase.ListBudgetsQuery(
+                OWNER_ID, 0, DEFAULT_SIZE, "createdAt", false);
+        when(listBudgetsUseCase.list(expectedQuery))
+                .thenReturn(new PageResult<>(List.of(), 0, DEFAULT_SIZE, 0L));
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            var response = controller.list(null, null, null);
+
+            // Assert
+            verify(listBudgetsUseCase).list(expectedQuery);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(response.getBody()).isNotNull();
+        }
+    }
+
+    @Test
+    @DisplayName("Deve aplicar ordenação padrão quando sort contiver apenas espaços")
+    void shouldUseDefaultSortWhenSortIsBlank() {
+        // Arrange
+        stubMaxPageSize();
+        var expectedQuery = new ListBudgetsUseCase.ListBudgetsQuery(
+                OWNER_ID, 1, 10, "createdAt", false);
+        when(listBudgetsUseCase.list(expectedQuery))
+                .thenReturn(new PageResult<>(List.of(), 1, 10, 0L));
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            var response = controller.list(1, 10, "   ");
+
+            // Assert
+            verify(listBudgetsUseCase).list(expectedQuery);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve ordenar de forma ascendente quando apenas o campo for informado")
+    void shouldSortAscendingWhenDirectionIsOmitted() {
+        // Arrange
+        stubMaxPageSize();
+        var expectedQuery = new ListBudgetsUseCase.ListBudgetsQuery(
+                OWNER_ID, 2, 10, "updatedAt", true);
+        when(listBudgetsUseCase.list(expectedQuery))
+                .thenReturn(new PageResult<>(List.of(), 2, 10, 0L));
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            var response = controller.list(2, 10, " updatedAt ");
+
+            // Assert
+            verify(listBudgetsUseCase).list(expectedQuery);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve ordenar de forma descendente quando direção desc for informada")
+    void shouldSortDescending() {
+        // Arrange
+        stubMaxPageSize();
+        var expectedQuery = new ListBudgetsUseCase.ListBudgetsQuery(
+                OWNER_ID, 1, 10, "periodStart", false);
+        when(listBudgetsUseCase.list(expectedQuery))
+                .thenReturn(new PageResult<>(List.of(), 1, 10, 0L));
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            var response = controller.list(1, 10, "periodStart, DESC ");
+
+            // Assert
+            verify(listBudgetsUseCase).list(expectedQuery);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve aceitar direção asc explicitamente sem diferenciar maiúsculas de minúsculas")
+    void shouldAcceptExplicitAscendingSort() {
+        // Arrange
+        stubMaxPageSize();
+        var expectedQuery = new ListBudgetsUseCase.ListBudgetsQuery(
+                OWNER_ID, 1, 10, "status", true);
+        when(listBudgetsUseCase.list(expectedQuery))
+                .thenReturn(new PageResult<>(List.of(), 1, 10, 0L));
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            var response = controller.list(1, 10, "status,ASC");
+
+            // Assert
+            verify(listBudgetsUseCase).list(expectedQuery);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar página negativa")
+    void shouldRejectNegativePage() {
+        // Arrange
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            ThrowingCallable action = () -> controller.list(-1, 10, "createdAt");
+
+            // Assert
+            assertThatThrownBy(action)
+                    .isInstanceOf(PaginationParameterInvalidException.class)
+                    .hasMessage("Field 'page' must be greater than or equal to zero");
+
+            verifyNoInteractions(listBudgetsUseCase);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar tamanho de página menor que um")
+    void shouldRejectPageSizeBelowMinimum() {
+        // Arrange
+        stubMaxPageSize();
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            ThrowingCallable action = () -> controller.list(0, 0, "createdAt");
+
+            // Assert
+            assertThatThrownBy(action)
+                    .isInstanceOf(PaginationParameterInvalidException.class)
+                    .hasMessage("Field 'size' must be between 1 and " + MAX_SIZE);
+
+            verifyNoInteractions(listBudgetsUseCase);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar tamanho de página maior que o máximo permitido")
+    void shouldRejectPageSizeAboveMaximum() {
+        // Arrange
+        stubMaxPageSize();
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            ThrowingCallable action = () -> controller.list(0, MAX_SIZE + 1, "createdAt");
+
+            // Assert
+            assertThatThrownBy(action)
+                    .isInstanceOf(PaginationParameterInvalidException.class)
+                    .hasMessage("Field 'size' must be between 1 and " + MAX_SIZE);
+
+            verifyNoInteractions(listBudgetsUseCase);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar campo de ordenação fora da lista permitida")
+    void shouldRejectUnsupportedSortField() {
+        // Arrange
+        stubMaxPageSize();
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            ThrowingCallable action = () -> controller.list(0, 10, "amount,asc");
+
+            // Assert
+            assertThatThrownBy(action)
+                    .isInstanceOf(PaginationParameterInvalidException.class)
+                    .hasMessageContaining("Field 'sort' must be one of:");
+
+            verifyNoInteractions(listBudgetsUseCase);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar direção de ordenação diferente de asc ou desc")
+    void shouldRejectUnsupportedSortDirection() {
+        // Arrange
+        stubMaxPageSize();
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            ThrowingCallable action = () -> controller.list(0, 10, "createdAt,sideways");
+
+            // Assert
+            assertThatThrownBy(action)
+                    .isInstanceOf(PaginationParameterInvalidException.class)
+                    .hasMessage("Field 'sort' direction must be 'asc' or 'desc'");
+
+            verifyNoInteractions(listBudgetsUseCase);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve buscar orçamento quando ele pertencer ao usuário autenticado")
+    void shouldGetOwnedBudget() {
+        // Arrange
+        BudgetResult budget = ownedBudget();
+        BudgetResponse expectedBody = mock(BudgetResponse.class);
+        when(getBudgetUseCase.get(BUDGET_ID)).thenReturn(budget);
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner();
+             MockedStatic<BudgetResponse> responseFactory = mockStatic(BudgetResponse.class)) {
+            responseFactory.when(() -> BudgetResponse.from(budget)).thenReturn(expectedBody);
+
+            // Act
+            var response = controller.get(BUDGET_ID);
+
+            // Assert
+            verify(getBudgetUseCase).get(BUDGET_ID);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(response.getBody()).isSameAs(expectedBody);
+        }
+    }
+
+    @Test
+    @DisplayName("Deve negar acesso e incrementar métrica quando orçamento pertencer a outro usuário")
+    void shouldRejectBudgetOwnedByAnotherUser() {
+        // Arrange
+        BudgetResult budget = mock(BudgetResult.class);
+        Counter counter = mock(Counter.class);
+
+        when(budget.userId()).thenReturn(OTHER_OWNER_ID);
+        when(getBudgetUseCase.get(BUDGET_ID)).thenReturn(budget);
+        when(meterRegistry.counter(
+                "ecofy.budgeting.ownership.denied.total", "operation", "budget"))
+                .thenReturn(counter);
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner()) {
+            // Act
+            ThrowingCallable action = () -> controller.get(BUDGET_ID);
+
+            // Assert
+            assertThatThrownBy(action)
+                    .isInstanceOf(BudgetAccessForbiddenException.class);
+
+            verify(counter).increment();
+        }
+    }
+
+    @Test
+    @DisplayName("Deve retornar a visão geral dos orçamentos do usuário autenticado")
+    void shouldReturnBudgetOverview() {
+        // Arrange
+        BudgetOverviewResponse expectedBody = mock(BudgetOverviewResponse.class);
+
+        try (MockedStatic<AuthenticatedUser> authenticatedUser = mockAuthenticatedOwner();
+             MockedStatic<BudgetOverviewResponse> responseFactory = mockStatic(BudgetOverviewResponse.class)) {
+            responseFactory.when(() -> BudgetOverviewResponse.from(null)).thenReturn(expectedBody);
+
+            // Act
+            var response = controller.overview();
+
+            // Assert
+            verify(getBudgetOverviewUseCase).overview(OWNER_ID);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(response.getBody()).isSameAs(expectedBody);
+        }
+    }
+
+    private BudgetResult ownedBudget() {
+        BudgetResult budget = mock(BudgetResult.class);
+        when(budget.userId()).thenReturn(OWNER_ID);
+        return budget;
+    }
+
+    private MockedStatic<AuthenticatedUser> mockAuthenticatedOwner() {
+        when(props.security().ownerClaim()).thenReturn(OWNER_CLAIM);
+        MockedStatic<AuthenticatedUser> authenticatedUser = mockStatic(AuthenticatedUser.class);
+        authenticatedUser.when(() -> AuthenticatedUser.requireOwnerId(OWNER_CLAIM)).thenReturn(OWNER_ID);
+        return authenticatedUser;
+    }
+
+    private void stubPaginationDefaults() {
+        when(props.pagination().maxSize()).thenReturn(MAX_SIZE);
+        when(props.pagination().defaultSize()).thenReturn(DEFAULT_SIZE);
+    }
+
+    private void stubMaxPageSize() {
+        when(props.pagination().maxSize()).thenReturn(MAX_SIZE);
     }
 }

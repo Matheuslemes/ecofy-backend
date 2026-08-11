@@ -7,7 +7,6 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -19,16 +18,16 @@ class UpdateBudgetRequestTest {
 
     @Test
     void shouldCreateUpdateBudgetRequestWithAllFields() {
-        BigDecimal newLimitAmount = new BigDecimal("500.00");
+        Long newLimitAmountCents = 50000L; // 500.00
         BudgetStatus status = anyBudgetStatus();
 
         UpdateBudgetRequest request = new UpdateBudgetRequest(
-                newLimitAmount,
+                newLimitAmountCents,
                 "BRL",
                 status
         );
 
-        assertEquals(newLimitAmount, request.newLimitAmount());
+        assertEquals(newLimitAmountCents, request.newLimitAmountCents());
         assertEquals("BRL", request.currency());
         assertEquals(status, request.status());
     }
@@ -41,13 +40,13 @@ class UpdateBudgetRequestTest {
                 null
         );
 
-        assertNull(request.newLimitAmount());
+        assertNull(request.newLimitAmountCents());
         assertNull(request.currency());
         assertNull(request.status());
     }
 
     @Test
-    void shouldPassValidationWhenAllFieldsAreNullBecauseOnlyDecimalMinExists() {
+    void shouldPassValidationWhenAllFieldsAreNullBecauseOnlyMinExists() {
         UpdateBudgetRequest request = new UpdateBudgetRequest(
                 null,
                 null,
@@ -63,7 +62,7 @@ class UpdateBudgetRequestTest {
     @Test
     void shouldPassValidationWhenNewLimitAmountIsEqualToMinimum() {
         UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("0.01"),
+                1L, // 1 centavo (mínimo)
                 "BRL",
                 anyBudgetStatus()
         );
@@ -77,7 +76,7 @@ class UpdateBudgetRequestTest {
     @Test
     void shouldPassValidationWhenNewLimitAmountIsGreaterThanMinimum() {
         UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
+                10000L,
                 "BRL",
                 anyBudgetStatus()
         );
@@ -91,7 +90,7 @@ class UpdateBudgetRequestTest {
     @Test
     void shouldFailValidationWhenNewLimitAmountIsLowerThanMinimum() {
         UpdateBudgetRequest request = new UpdateBudgetRequest(
-                BigDecimal.ZERO,
+                0L,
                 "BRL",
                 anyBudgetStatus()
         );
@@ -102,13 +101,13 @@ class UpdateBudgetRequestTest {
         Set<String> fields = propertyNames(violations);
 
         assertEquals(1, violations.size());
-        assertTrue(fields.contains("newLimitAmount"));
+        assertTrue(fields.contains("newLimitAmountCents"));
     }
 
     @Test
     void shouldFailValidationWhenNewLimitAmountIsNegative() {
         UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("-10.00"),
+                -1000L,
                 "BRL",
                 anyBudgetStatus()
         );
@@ -119,13 +118,13 @@ class UpdateBudgetRequestTest {
         Set<String> fields = propertyNames(violations);
 
         assertEquals(1, violations.size());
-        assertTrue(fields.contains("newLimitAmount"));
+        assertTrue(fields.contains("newLimitAmountCents"));
     }
 
     @Test
     void shouldAllowBlankCurrencyBecauseCurrencyHasNoValidationAnnotation() {
         UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
+                10000L,
                 "   ",
                 anyBudgetStatus()
         );
@@ -141,23 +140,9 @@ class UpdateBudgetRequestTest {
     void shouldCompareUpdateBudgetRequestByAllRecordComponents() {
         BudgetStatus status = anyBudgetStatus();
 
-        UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
-                "BRL",
-                status
-        );
-
-        UpdateBudgetRequest sameRequest = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
-                "BRL",
-                status
-        );
-
-        UpdateBudgetRequest differentRequest = new UpdateBudgetRequest(
-                new BigDecimal("200.00"),
-                "BRL",
-                status
-        );
+        UpdateBudgetRequest request = new UpdateBudgetRequest(10000L, "BRL", status);
+        UpdateBudgetRequest sameRequest = new UpdateBudgetRequest(10000L, "BRL", status);
+        UpdateBudgetRequest differentRequest = new UpdateBudgetRequest(20000L, "BRL", status);
 
         assertEquals(request, request);
         assertEquals(request, sameRequest);
@@ -170,17 +155,8 @@ class UpdateBudgetRequestTest {
     void shouldGenerateHashCodeUsingAllRecordComponents() {
         BudgetStatus status = anyBudgetStatus();
 
-        UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
-                "BRL",
-                status
-        );
-
-        UpdateBudgetRequest sameRequest = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
-                "BRL",
-                status
-        );
+        UpdateBudgetRequest request = new UpdateBudgetRequest(10000L, "BRL", status);
+        UpdateBudgetRequest sameRequest = new UpdateBudgetRequest(10000L, "BRL", status);
 
         assertEquals(request, sameRequest);
         assertEquals(request.hashCode(), sameRequest.hashCode());
@@ -190,17 +166,8 @@ class UpdateBudgetRequestTest {
     void shouldNotBeEqualWhenCurrencyChanges() {
         BudgetStatus status = anyBudgetStatus();
 
-        UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
-                "BRL",
-                status
-        );
-
-        UpdateBudgetRequest differentRequest = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
-                "USD",
-                status
-        );
+        UpdateBudgetRequest request = new UpdateBudgetRequest(10000L, "BRL", status);
+        UpdateBudgetRequest differentRequest = new UpdateBudgetRequest(10000L, "USD", status);
 
         assertNotEquals(request, differentRequest);
     }
@@ -213,17 +180,8 @@ class UpdateBudgetRequestTest {
             return;
         }
 
-        UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
-                "BRL",
-                statuses[0]
-        );
-
-        UpdateBudgetRequest differentRequest = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
-                "BRL",
-                statuses[1]
-        );
+        UpdateBudgetRequest request = new UpdateBudgetRequest(10000L, "BRL", statuses[0]);
+        UpdateBudgetRequest differentRequest = new UpdateBudgetRequest(10000L, "BRL", statuses[1]);
 
         assertNotEquals(request, differentRequest);
     }
@@ -232,16 +190,12 @@ class UpdateBudgetRequestTest {
     void shouldReturnToStringWithRecordComponents() {
         BudgetStatus status = anyBudgetStatus();
 
-        UpdateBudgetRequest request = new UpdateBudgetRequest(
-                new BigDecimal("100.00"),
-                "BRL",
-                status
-        );
+        UpdateBudgetRequest request = new UpdateBudgetRequest(10000L, "BRL", status);
 
         String result = request.toString();
 
         assertTrue(result.contains("UpdateBudgetRequest"));
-        assertTrue(result.contains("newLimitAmount=100.00"));
+        assertTrue(result.contains("newLimitAmountCents=10000"));
         assertTrue(result.contains("currency=BRL"));
         assertTrue(result.contains("status=" + status));
     }

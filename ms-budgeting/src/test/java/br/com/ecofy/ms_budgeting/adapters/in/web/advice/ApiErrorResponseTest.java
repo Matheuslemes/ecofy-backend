@@ -1,45 +1,57 @@
 package br.com.ecofy.ms_budgeting.adapters.in.web.advice;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class ApiErrorResponseTest {
 
-    private static final Instant TIMESTAMP =
-            Instant.parse("2026-06-25T10:30:00Z");
-
-    private static final Map<String, Object> DETAILS = Map.of(
-            "field", "amount",
-            "reason", "must be positive"
-    );
-
     @Test
-    void shouldCreateApiErrorResponseWithAllFields() {
-        ApiErrorResponse response = new ApiErrorResponse(
-                TIMESTAMP,
-                400,
-                "Bad Request",
-                "Invalid request body",
-                "/api/v1/budgets",
-                "trace-001",
-                DETAILS
+    @DisplayName("Deve criar resposta de erro com todos os campos preenchidos")
+    void shouldCreateErrorResponseWithAllFields() {
+        // Arrange
+        Instant timestamp = Instant.parse("2026-08-11T19:00:00Z");
+        int status = 400;
+        String errorCode = "VALIDATION_ERROR";
+        String message = "Dados inválidos";
+        String path = "/api/v1/budgets";
+        String traceId = "trace-123";
+        Map<String, Object> details = Map.of(
+                "field", "amount",
+                "reason", "must be positive"
         );
 
-        assertEquals(TIMESTAMP, response.timestamp());
-        assertEquals(400, response.status());
-        assertEquals("Bad Request", response.error());
-        assertEquals("Invalid request body", response.message());
-        assertEquals("/api/v1/budgets", response.path());
-        assertEquals("trace-001", response.traceId());
-        assertEquals(DETAILS, response.details());
+        // Act
+        ApiErrorResponse response = new ApiErrorResponse(
+                timestamp,
+                status,
+                errorCode,
+                message,
+                path,
+                traceId,
+                details
+        );
+
+        // Assert
+        assertThat(response.timestamp()).isEqualTo(timestamp);
+        assertThat(response.status()).isEqualTo(status);
+        assertThat(response.errorCode()).isEqualTo(errorCode);
+        assertThat(response.message()).isEqualTo(message);
+        assertThat(response.path()).isEqualTo(path);
+        assertThat(response.traceId()).isEqualTo(traceId);
+        assertThat(response.details()).isEqualTo(details);
     }
 
     @Test
-    void shouldCreateApiErrorResponseWithNullFields() {
+    @DisplayName("Deve permitir criação da resposta com campos de referência nulos")
+    void shouldAllowCreationWithNullReferenceFields() {
+        // Arrange
+
+        // Act
         ApiErrorResponse response = new ApiErrorResponse(
                 null,
                 0,
@@ -50,139 +62,308 @@ class ApiErrorResponseTest {
                 null
         );
 
-        assertNull(response.timestamp());
-        assertEquals(0, response.status());
-        assertNull(response.error());
-        assertNull(response.message());
-        assertNull(response.path());
-        assertNull(response.traceId());
-        assertNull(response.details());
+        // Assert
+        assertThat(response.timestamp()).isNull();
+        assertThat(response.status()).isZero();
+        assertThat(response.errorCode()).isNull();
+        assertThat(response.message()).isNull();
+        assertThat(response.path()).isNull();
+        assertThat(response.traceId()).isNull();
+        assertThat(response.details()).isNull();
     }
 
     @Test
-    void shouldCompareApiErrorResponseByAllRecordComponents() {
+    @DisplayName("Deve permitir mapa de detalhes vazio")
+    void shouldAllowEmptyDetails() {
+        // Arrange
+        Map<String, Object> details = Map.of();
+
+        // Act
         ApiErrorResponse response = new ApiErrorResponse(
-                TIMESTAMP,
-                400,
-                "Bad Request",
-                "Invalid request body",
-                "/api/v1/budgets",
-                "trace-001",
-                DETAILS
-        );
-
-        ApiErrorResponse sameResponse = new ApiErrorResponse(
-                TIMESTAMP,
-                400,
-                "Bad Request",
-                "Invalid request body",
-                "/api/v1/budgets",
-                "trace-001",
-                DETAILS
-        );
-
-        ApiErrorResponse differentResponse = new ApiErrorResponse(
-                TIMESTAMP,
+                Instant.parse("2026-08-11T19:00:00Z"),
                 404,
-                "Not Found",
-                "Budget not found",
-                "/api/v1/budgets/123",
-                "trace-001",
-                DETAILS
+                "NOT_FOUND",
+                "Recurso não encontrado",
+                "/api/v1/budgets/1",
+                "trace-123",
+                details
         );
 
-        assertEquals(response, response);
-        assertEquals(response, sameResponse);
-        assertNotEquals(response, differentResponse);
-        assertNotEquals(response, null);
-        assertNotEquals(response, "not-an-api-error-response");
+        // Assert
+        assertThat(response.details()).isEmpty();
     }
 
     @Test
-    void shouldGenerateHashCodeUsingAllRecordComponents() {
-        ApiErrorResponse response = new ApiErrorResponse(
-                TIMESTAMP,
+    @DisplayName("Deve considerar respostas iguais quando todos os campos forem iguais")
+    void shouldConsiderResponsesEqualWhenAllFieldsAreEqual() {
+        // Arrange
+        Instant timestamp = Instant.parse("2026-08-11T19:00:00Z");
+        Map<String, Object> details = Map.of("field", "amount");
+
+        ApiErrorResponse first = new ApiErrorResponse(
+                timestamp,
                 400,
-                "Bad Request",
-                "Invalid request body",
+                "VALIDATION_ERROR",
+                "Dados inválidos",
                 "/api/v1/budgets",
-                "trace-001",
-                DETAILS
+                "trace-123",
+                details
         );
 
-        ApiErrorResponse sameResponse = new ApiErrorResponse(
-                TIMESTAMP,
+        ApiErrorResponse second = new ApiErrorResponse(
+                timestamp,
                 400,
-                "Bad Request",
-                "Invalid request body",
+                "VALIDATION_ERROR",
+                "Dados inválidos",
                 "/api/v1/budgets",
-                "trace-001",
-                DETAILS
+                "trace-123",
+                details
         );
 
-        assertEquals(response, sameResponse);
-        assertEquals(response.hashCode(), sameResponse.hashCode());
+        // Act / Assert
+        assertThat(first)
+                .isEqualTo(second)
+                .hasSameHashCodeAs(second);
     }
 
     @Test
-    void shouldNotBeEqualWhenStatusChanges() {
-        ApiErrorResponse response = baseResponse();
+    @DisplayName("Deve considerar a mesma instância igual a ela mesma")
+    void shouldConsiderSameInstanceEqual() {
+        // Arrange
+        ApiErrorResponse response = createResponse();
 
-        ApiErrorResponse differentResponse = new ApiErrorResponse(
-                TIMESTAMP,
+        // Act / Assert
+        assertThat(response).isEqualTo(response);
+    }
+
+    @Test
+    @DisplayName("Deve considerar resposta diferente de nulo e de outro tipo")
+    void shouldConsiderResponseDifferentFromNullAndOtherType() {
+        // Arrange
+        ApiErrorResponse response = createResponse();
+
+        // Act / Assert
+        assertThat(response).isNotEqualTo(null);
+        assertThat(response).isNotEqualTo("outro-objeto");
+    }
+
+    @Test
+    @DisplayName("Deve considerar respostas diferentes quando o timestamp for diferente")
+    void shouldConsiderResponsesDifferentWhenTimestampDiffers() {
+        // Arrange
+        ApiErrorResponse first = createResponse();
+
+        ApiErrorResponse second = new ApiErrorResponse(
+                Instant.parse("2026-08-12T19:00:00Z"),
+                first.status(),
+                first.errorCode(),
+                first.message(),
+                first.path(),
+                first.traceId(),
+                first.details()
+        );
+
+        // Act / Assert
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    @DisplayName("Deve considerar respostas diferentes quando o status for diferente")
+    void shouldConsiderResponsesDifferentWhenStatusDiffers() {
+        // Arrange
+        ApiErrorResponse first = createResponse();
+
+        ApiErrorResponse second = new ApiErrorResponse(
+                first.timestamp(),
                 500,
-                "Bad Request",
-                "Invalid request body",
-                "/api/v1/budgets",
-                "trace-001",
-                DETAILS
+                first.errorCode(),
+                first.message(),
+                first.path(),
+                first.traceId(),
+                first.details()
         );
 
-        assertNotEquals(response, differentResponse);
+        // Act / Assert
+        assertThat(first).isNotEqualTo(second);
     }
 
     @Test
-    void shouldNotBeEqualWhenDetailsChange() {
-        ApiErrorResponse response = baseResponse();
+    @DisplayName("Deve considerar respostas diferentes quando o código de erro for diferente")
+    void shouldConsiderResponsesDifferentWhenErrorCodeDiffers() {
+        // Arrange
+        ApiErrorResponse first = createResponse();
 
-        ApiErrorResponse differentResponse = new ApiErrorResponse(
-                TIMESTAMP,
-                400,
-                "Bad Request",
-                "Invalid request body",
-                "/api/v1/budgets",
-                "trace-001",
+        ApiErrorResponse second = new ApiErrorResponse(
+                first.timestamp(),
+                first.status(),
+                "INTERNAL_ERROR",
+                first.message(),
+                first.path(),
+                first.traceId(),
+                first.details()
+        );
+
+        // Act / Assert
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    @DisplayName("Deve considerar respostas diferentes quando a mensagem for diferente")
+    void shouldConsiderResponsesDifferentWhenMessageDiffers() {
+        // Arrange
+        ApiErrorResponse first = createResponse();
+
+        ApiErrorResponse second = new ApiErrorResponse(
+                first.timestamp(),
+                first.status(),
+                first.errorCode(),
+                "Outra mensagem",
+                first.path(),
+                first.traceId(),
+                first.details()
+        );
+
+        // Act / Assert
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    @DisplayName("Deve considerar respostas diferentes quando o path for diferente")
+    void shouldConsiderResponsesDifferentWhenPathDiffers() {
+        // Arrange
+        ApiErrorResponse first = createResponse();
+
+        ApiErrorResponse second = new ApiErrorResponse(
+                first.timestamp(),
+                first.status(),
+                first.errorCode(),
+                first.message(),
+                "/api/v1/other",
+                first.traceId(),
+                first.details()
+        );
+
+        // Act / Assert
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    @DisplayName("Deve considerar respostas diferentes quando o traceId for diferente")
+    void shouldConsiderResponsesDifferentWhenTraceIdDiffers() {
+        // Arrange
+        ApiErrorResponse first = createResponse();
+
+        ApiErrorResponse second = new ApiErrorResponse(
+                first.timestamp(),
+                first.status(),
+                first.errorCode(),
+                first.message(),
+                first.path(),
+                "trace-456",
+                first.details()
+        );
+
+        // Act / Assert
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    @DisplayName("Deve considerar respostas diferentes quando os detalhes forem diferentes")
+    void shouldConsiderResponsesDifferentWhenDetailsDiffer() {
+        // Arrange
+        ApiErrorResponse first = createResponse();
+
+        ApiErrorResponse second = new ApiErrorResponse(
+                first.timestamp(),
+                first.status(),
+                first.errorCode(),
+                first.message(),
+                first.path(),
+                first.traceId(),
                 Map.of("field", "currency")
         );
 
-        assertNotEquals(response, differentResponse);
+        // Act / Assert
+        assertThat(first).isNotEqualTo(second);
     }
 
     @Test
-    void shouldReturnToStringWithRecordComponents() {
-        ApiErrorResponse response = baseResponse();
+    @DisplayName("Deve considerar iguais respostas com todos os campos de referência nulos")
+    void shouldConsiderResponsesWithNullFieldsEqual() {
+        // Arrange
+        ApiErrorResponse first = new ApiErrorResponse(
+                null,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
 
-        String result = response.toString();
+        ApiErrorResponse second = new ApiErrorResponse(
+                null,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
 
-        assertTrue(result.contains("ApiErrorResponse"));
-        assertTrue(result.contains("timestamp=" + TIMESTAMP));
-        assertTrue(result.contains("status=400"));
-        assertTrue(result.contains("error=Bad Request"));
-        assertTrue(result.contains("message=Invalid request body"));
-        assertTrue(result.contains("path=/api/v1/budgets"));
-        assertTrue(result.contains("traceId=trace-001"));
-        assertTrue(result.contains("details="));
+        // Act / Assert
+        assertThat(first)
+                .isEqualTo(second)
+                .hasSameHashCodeAs(second);
     }
 
-    private static ApiErrorResponse baseResponse() {
+    @Test
+    @DisplayName("Deve gerar hashCode consistente")
+    void shouldGenerateConsistentHashCode() {
+        // Arrange
+        ApiErrorResponse response = createResponse();
+
+        // Act
+        int firstHashCode = response.hashCode();
+        int secondHashCode = response.hashCode();
+
+        // Assert
+        assertThat(firstHashCode).isEqualTo(secondHashCode);
+    }
+
+    @Test
+    @DisplayName("Deve gerar representação textual contendo todos os campos")
+    void shouldGenerateToStringContainingAllFields() {
+        // Arrange
+        ApiErrorResponse response = createResponse();
+
+        // Act
+        String result = response.toString();
+
+        // Assert
+        assertThat(result)
+                .contains("ApiErrorResponse")
+                .contains("timestamp=" + response.timestamp())
+                .contains("status=" + response.status())
+                .contains("errorCode=" + response.errorCode())
+                .contains("message=" + response.message())
+                .contains("path=" + response.path())
+                .contains("traceId=" + response.traceId())
+                .contains("details=" + response.details());
+    }
+
+    private ApiErrorResponse createResponse() {
         return new ApiErrorResponse(
-                TIMESTAMP,
+                Instant.parse("2026-08-11T19:00:00Z"),
                 400,
-                "Bad Request",
-                "Invalid request body",
+                "VALIDATION_ERROR",
+                "Dados inválidos",
                 "/api/v1/budgets",
-                "trace-001",
-                DETAILS
+                "trace-123",
+                Map.of(
+                        "field", "amount",
+                        "reason", "must be positive"
+                )
         );
     }
 }

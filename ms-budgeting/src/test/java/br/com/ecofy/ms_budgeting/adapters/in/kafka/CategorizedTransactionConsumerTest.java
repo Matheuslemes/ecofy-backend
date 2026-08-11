@@ -5,278 +5,437 @@ import br.com.ecofy.ms_budgeting.adapters.in.kafka.mapper.InboundEventMapper;
 import br.com.ecofy.ms_budgeting.core.application.command.ProcessTransactionCommand;
 import br.com.ecofy.ms_budgeting.core.application.service.BudgetEventIngestionService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.header.internals.RecordHeader;
-import org.apache.kafka.common.header.internals.RecordHeaders;
-import org.apache.kafka.common.record.TimestampType;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-/**
- * Correção Dia 6 (item #9): o consumer passou a delegar para o BudgetEventIngestionService,
- * que centraliza MDC/validação/logs/tratamento de exceções. A validação de campos obrigatórios
- * é coberta por BudgetEventIngestionServiceTest.
- */
+@ExtendWith(MockitoExtension.class)
 class CategorizedTransactionConsumerTest {
 
-    private static final String TOPIC = "categorized-transactions";
-    private static final int PARTITION = 1;
-    private static final long OFFSET = 10L;
-    private static final String KEY = "transaction-key";
-    private static final long TIMESTAMP = 1_767_000_000_000L;
+    @Mock
+    private InboundEventMapper mapper;
 
-    private static final UUID TRANSACTION_ID =
-            UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    @Mock
+    private BudgetEventIngestionService ingestionService;
 
-    private static final UUID USER_ID =
-            UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
-
-    private static final UUID CATEGORY_ID =
-            UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
-
-    private final InboundEventMapper mapper = mock(InboundEventMapper.class);
-    private final BudgetEventIngestionService ingestionService = mock(BudgetEventIngestionService.class);
-
-    private final CategorizedTransactionConsumer consumer =
-            new CategorizedTransactionConsumer(mapper, ingestionService);
+    @InjectMocks
+    private CategorizedTransactionConsumer consumer;
 
     @Test
-    void shouldConsumeMessageMapCommandAndDelegateToIngestionService() {
-        CategorizedTransactionMessage msg = validMessage();
-        ProcessTransactionCommand command = mock(ProcessTransactionCommand.class);
+    @DisplayName("Deve converter e processar mensagem válida com headers de correlação e evento")
+    void shouldConvertAndProcessValidMessageWithHeaders() {
+        // Arrange
+        CategorizedTransactionMessage message = createMessage();
 
-        ConsumerRecord<String, CategorizedTransactionMessage> record = record(
-                msg,
-                new RecordHeaders()
-                        .add(header("eventId", "event-001"))
-                        .add(header("correlationId", "correlation-001"))
-        );
+        ConsumerRecord<String, CategorizedTransactionMessage> record =
+                createRecord(message);
+
+        record.headers()
+                .add(
+                        "correlationId",
+                        "correlation-123".getBytes(StandardCharsets.UTF_8)
+                )
+                .add(
+                        "eventId",
+                        "event-456".getBytes(StandardCharsets.UTF_8)
+                );
+
+        ProcessTransactionCommand command = createCommand(message);
 
         when(mapper.toCommand(
-                same(msg),
+                eq(message),
                 any(UUID.class),
-                eq("event-001"),
-                eq("correlation-001"),
-                same(record)
+                eq("event-456"),
+                eq("correlation-123"),
+                eq(record)
         )).thenReturn(command);
-
-        consumer.onMessage(record);
 
         ArgumentCaptor<UUID> runIdCaptor = ArgumentCaptor.forClass(UUID.class);
 
+        // Act
+        consumer.onMessage(record);
+
+        // Assert
         verify(mapper).toCommand(
-                same(msg),
+                eq(message),
                 runIdCaptor.capture(),
-                eq("event-001"),
-                eq("correlation-001"),
-                same(record)
+                eq("event-456"),
+                eq("correlation-123"),
+                eq(record)
         );
 
-        assertNotNull(runIdCaptor.getValue());
+        assertThat(runIdCaptor.getValue()).isNotNull();
 
         verify(ingestionService).ingest(command);
+        verifyNoMoreInteractions(mapper, ingestionService);
     }
 
     @Test
-    void shouldConsumeMessageWithMissingHeadersPassingNullEventIdAndCorrelationId() {
-        CategorizedTransactionMessage msg = validMessage();
-        ProcessTransactionCommand command = mock(ProcessTransactionCommand.class);
+    @DisplayName("Deve processar mensagem quando os headers não estiverem presentes")
+    void shouldProcessMessageWhenHeadersAreMissing() {
+        // Arrange
+        CategorizedTransactionMessage message = createMessage();
 
-        ConsumerRecord<String, CategorizedTransactionMessage> record = record(
-                msg,
-                new RecordHeaders()
-        );
+        ConsumerRecord<String, CategorizedTransactionMessage> record =
+                createRecord(message);
+
+        ProcessTransactionCommand command = createCommand(message);
 
         when(mapper.toCommand(
-                same(msg),
+                eq(message),
                 any(UUID.class),
                 isNull(),
                 isNull(),
-                same(record)
+                eq(record)
         )).thenReturn(command);
 
+        ArgumentCaptor<UUID> runIdCaptor = ArgumentCaptor.forClass(UUID.class);
+
+        // Act
         consumer.onMessage(record);
 
+        // Assert
         verify(mapper).toCommand(
-                same(msg),
-                any(UUID.class),
+                eq(message),
+                runIdCaptor.capture(),
                 isNull(),
                 isNull(),
-                same(record)
+                eq(record)
         );
+
+        assertThat(runIdCaptor.getValue()).isNotNull();
 
         verify(ingestionService).ingest(command);
     }
 
     @Test
-    void shouldConsumeMessageWithNullHeaderValuesPassingNullEventIdAndCorrelationId() {
-        CategorizedTransactionMessage msg = validMessage();
-        ProcessTransactionCommand command = mock(ProcessTransactionCommand.class);
+    @DisplayName("Deve processar mensagem com identificadores nulos quando os valores dos headers forem nulos")
+    void shouldProcessMessageWithNullIdentifiersWhenHeaderValuesAreNull() {
+        // Arrange
+        CategorizedTransactionMessage message = createMessage();
 
-        ConsumerRecord<String, CategorizedTransactionMessage> record = record(
-                msg,
-                new RecordHeaders()
-                        .add(new RecordHeader("eventId", null))
-                        .add(new RecordHeader("correlationId", null))
-        );
+        ConsumerRecord<String, CategorizedTransactionMessage> record =
+                createRecord(message);
+
+        record.headers()
+                .add(new RecordHeader("correlationId", null))
+                .add(new RecordHeader("eventId", null));
+
+        ProcessTransactionCommand command = createCommand(message);
 
         when(mapper.toCommand(
-                same(msg),
+                eq(message),
                 any(UUID.class),
                 isNull(),
                 isNull(),
-                same(record)
+                eq(record)
         )).thenReturn(command);
 
+        // Act
         consumer.onMessage(record);
 
+        // Assert
         verify(mapper).toCommand(
-                same(msg),
+                eq(message),
                 any(UUID.class),
                 isNull(),
                 isNull(),
-                same(record)
+                eq(record)
         );
 
         verify(ingestionService).ingest(command);
     }
 
     @Test
-    void shouldIgnoreNullPayloadAndNotCallMapperOrIngestionService() {
-        ConsumerRecord<String, CategorizedTransactionMessage> record = record(
-                null,
-                new RecordHeaders()
-                        .add(header("eventId", "event-001"))
-                        .add(header("correlationId", "correlation-001"))
-        );
+    @DisplayName("Deve preservar header vazio ao converter mensagem recebida")
+    void shouldPreserveEmptyHeaderValue() {
+        // Arrange
+        CategorizedTransactionMessage message = createMessage();
 
+        ConsumerRecord<String, CategorizedTransactionMessage> record =
+                createRecord(message);
+
+        record.headers()
+                .add("correlationId", new byte[0])
+                .add("eventId", new byte[0]);
+
+        ProcessTransactionCommand command = createCommand(message);
+
+        when(mapper.toCommand(
+                eq(message),
+                any(UUID.class),
+                eq(""),
+                eq(""),
+                eq(record)
+        )).thenReturn(command);
+
+        // Act
         consumer.onMessage(record);
 
-        verifyNoInteractions(mapper);
+        // Assert
+        verify(mapper).toCommand(
+                eq(message),
+                any(UUID.class),
+                eq(""),
+                eq(""),
+                eq(record)
+        );
+
+        verify(ingestionService).ingest(command);
+    }
+
+    @Test
+    @DisplayName("Deve utilizar o último header quando existirem valores duplicados")
+    void shouldUseLastHeaderWhenHeadersAreDuplicated() {
+        // Arrange
+        CategorizedTransactionMessage message = createMessage();
+
+        ConsumerRecord<String, CategorizedTransactionMessage> record =
+                createRecord(message);
+
+        record.headers()
+                .add(
+                        "correlationId",
+                        "correlation-antigo".getBytes(StandardCharsets.UTF_8)
+                )
+                .add(
+                        "correlationId",
+                        "correlation-novo".getBytes(StandardCharsets.UTF_8)
+                )
+                .add(
+                        "eventId",
+                        "event-antigo".getBytes(StandardCharsets.UTF_8)
+                )
+                .add(
+                        "eventId",
+                        "event-novo".getBytes(StandardCharsets.UTF_8)
+                );
+
+        ProcessTransactionCommand command = createCommand(message);
+
+        when(mapper.toCommand(
+                eq(message),
+                any(UUID.class),
+                eq("event-novo"),
+                eq("correlation-novo"),
+                eq(record)
+        )).thenReturn(command);
+
+        // Act
+        consumer.onMessage(record);
+
+        // Assert
+        verify(mapper).toCommand(
+                eq(message),
+                any(UUID.class),
+                eq("event-novo"),
+                eq("correlation-novo"),
+                eq(record)
+        );
+
+        verify(ingestionService).ingest(command);
+    }
+
+    @Test
+    @DisplayName("Deve ignorar mensagem quando o payload for nulo")
+    void shouldIgnoreMessageWhenPayloadIsNull() {
+        // Arrange
+        ConsumerRecord<String, CategorizedTransactionMessage> record =
+                createRecord(null);
+
+        record.headers()
+                .add(
+                        "correlationId",
+                        "correlation-123".getBytes(StandardCharsets.UTF_8)
+                )
+                .add(
+                        "eventId",
+                        "event-456".getBytes(StandardCharsets.UTF_8)
+                );
+
+        // Act
+        consumer.onMessage(record);
+
+        // Assert
+        verifyNoInteractions(mapper, ingestionService);
+    }
+
+    @Test
+    @DisplayName("Deve ignorar payload nulo mesmo quando os headers não existirem")
+    void shouldIgnoreNullPayloadWhenHeadersAreMissing() {
+        // Arrange
+        ConsumerRecord<String, CategorizedTransactionMessage> record =
+                createRecord(null);
+
+        // Act
+        consumer.onMessage(record);
+
+        // Assert
+        verifyNoInteractions(mapper, ingestionService);
+    }
+
+    @Test
+    @DisplayName("Deve propagar exceção do mapper e não executar o serviço de ingestão")
+    void shouldPropagateMapperExceptionAndNotInvokeIngestionService() {
+        // Arrange
+        CategorizedTransactionMessage message = createMessage();
+
+        ConsumerRecord<String, CategorizedTransactionMessage> record =
+                createRecord(message);
+
+        record.headers()
+                .add(
+                        "correlationId",
+                        "correlation-123".getBytes(StandardCharsets.UTF_8)
+                )
+                .add(
+                        "eventId",
+                        "event-456".getBytes(StandardCharsets.UTF_8)
+                );
+
+        IllegalArgumentException exception =
+                new IllegalArgumentException("Erro ao mapear mensagem");
+
+        when(mapper.toCommand(
+                eq(message),
+                any(UUID.class),
+                eq("event-456"),
+                eq("correlation-123"),
+                eq(record)
+        )).thenThrow(exception);
+
+        // Act / Assert
+        assertThatThrownBy(() -> consumer.onMessage(record))
+                .isSameAs(exception)
+                .hasMessage("Erro ao mapear mensagem");
+
+        verify(mapper).toCommand(
+                eq(message),
+                any(UUID.class),
+                eq("event-456"),
+                eq("correlation-123"),
+                eq(record)
+        );
+
         verifyNoInteractions(ingestionService);
     }
 
     @Test
-    void shouldPropagateExceptionFromIngestionService() {
-        CategorizedTransactionMessage msg = validMessage();
-        ProcessTransactionCommand command = mock(ProcessTransactionCommand.class);
+    @DisplayName("Deve propagar exceção do serviço de ingestão")
+    void shouldPropagateIngestionServiceException() {
+        // Arrange
+        CategorizedTransactionMessage message = createMessage();
 
-        ConsumerRecord<String, CategorizedTransactionMessage> record = record(
-                msg,
-                new RecordHeaders()
+        ConsumerRecord<String, CategorizedTransactionMessage> record =
+                createRecord(message);
+
+        ProcessTransactionCommand command = createCommand(message);
+
+        when(mapper.toCommand(
+                eq(message),
+                any(UUID.class),
+                isNull(),
+                isNull(),
+                eq(record)
+        )).thenReturn(command);
+
+        RuntimeException exception =
+                new RuntimeException("Erro ao processar transação");
+
+        doThrow(exception)
+                .when(ingestionService)
+                .ingest(command);
+
+        // Act / Assert
+        assertThatThrownBy(() -> consumer.onMessage(record))
+                .isSameAs(exception)
+                .hasMessage("Erro ao processar transação");
+
+        verify(mapper).toCommand(
+                eq(message),
+                any(UUID.class),
+                isNull(),
+                isNull(),
+                eq(record)
         );
-
-        when(mapper.toCommand(same(msg), any(UUID.class), isNull(), isNull(), same(record)))
-                .thenReturn(command);
-        doThrow(new RuntimeException("ingestion boom")).when(ingestionService).ingest(command);
-
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.onMessage(record));
-        assertEquals("ingestion boom", ex.getMessage());
 
         verify(ingestionService).ingest(command);
     }
 
     @Test
-    void shouldReturnHeaderAsStringUsingPrivateHeaderAsString() throws Exception {
-        ConsumerRecord<String, CategorizedTransactionMessage> record = record(
-                validMessage(),
-                new RecordHeaders()
-                        .add(header("eventId", "event-001"))
+    @DisplayName("Deve lançar exceção quando o registro recebido for nulo")
+    void shouldThrowExceptionWhenRecordIsNull() {
+        // Arrange
+        ConsumerRecord<String, CategorizedTransactionMessage> record = null;
+
+        // Act / Assert
+        assertThatThrownBy(() -> consumer.onMessage(record))
+                .isInstanceOf(NullPointerException.class);
+
+        verifyNoInteractions(mapper, ingestionService);
+    }
+
+    private CategorizedTransactionMessage createMessage() {
+        return new CategorizedTransactionMessage(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("150.75"),
+                "BRL",
+                LocalDate.of(2026, 8, 11),
+                null
         );
-
-        String result = invokeHeaderAsString(record, "eventId");
-
-        assertEquals("event-001", result);
     }
 
-    @Test
-    void shouldReturnNullWhenHeaderDoesNotExistUsingPrivateHeaderAsString() throws Exception {
-        ConsumerRecord<String, CategorizedTransactionMessage> record = record(
-                validMessage(),
-                new RecordHeaders()
-        );
-
-        String result = invokeHeaderAsString(record, "eventId");
-
-        assertNull(result);
-    }
-
-    @Test
-    void shouldReturnNullWhenHeaderValueIsNullUsingPrivateHeaderAsString() throws Exception {
-        ConsumerRecord<String, CategorizedTransactionMessage> record = record(
-                validMessage(),
-                new RecordHeaders()
-                        .add(new RecordHeader("eventId", null))
-        );
-
-        String result = invokeHeaderAsString(record, "eventId");
-
-        assertNull(result);
-    }
-
-    private static CategorizedTransactionMessage validMessage() {
-        CategorizedTransactionMessage msg = mock(CategorizedTransactionMessage.class);
-
-        when(msg.transactionId()).thenReturn(TRANSACTION_ID);
-        when(msg.userId()).thenReturn(USER_ID);
-        when(msg.categoryId()).thenReturn(CATEGORY_ID);
-        lenient().when(msg.amount()).thenReturn(BigDecimal.valueOf(150.75));
-        lenient().when(msg.currency()).thenReturn("BRL");
-        lenient().when(msg.transactionDate()).thenReturn(LocalDate.of(2026, 1, 1));
-
-        return msg;
-    }
-
-    private static ConsumerRecord<String, CategorizedTransactionMessage> record(
-            CategorizedTransactionMessage msg,
-            Headers headers
+    private ConsumerRecord<String, CategorizedTransactionMessage> createRecord(
+            CategorizedTransactionMessage message
     ) {
         return new ConsumerRecord<>(
-                TOPIC,
-                PARTITION,
-                OFFSET,
-                TIMESTAMP,
-                TimestampType.CREATE_TIME,
-                -1,
-                -1,
-                KEY,
-                msg,
-                headers,
-                Optional.empty()
+                "categorized-transactions",
+                1,
+                42L,
+                "transaction-key",
+                message
         );
     }
 
-    private static Header header(String key, String value) {
-        return new RecordHeader(
-                key,
-                value.getBytes(StandardCharsets.UTF_8)
+    private ProcessTransactionCommand createCommand(
+            CategorizedTransactionMessage message
+    ) {
+        return new ProcessTransactionCommand(
+                UUID.randomUUID(),
+                message.transactionId(),
+                message.userId(),
+                message.categoryId(),
+                message.amount(),
+                message.currency(),
+                message.transactionDate(),
+                new ProcessTransactionCommand.EventMetadata(
+                        "event-456",
+                        "correlation-123",
+                        "categorized-transactions",
+                        1,
+                        42L,
+                        "transaction-key",
+                        Instant.EPOCH
+                )
         );
-    }
-
-    private static String invokeHeaderAsString(
-            ConsumerRecord<?, ?> record,
-            String key
-    ) throws Exception {
-        Method method = CategorizedTransactionConsumer.class.getDeclaredMethod(
-                "headerAsString",
-                ConsumerRecord.class,
-                String.class
-        );
-
-        method.setAccessible(true);
-
-        return (String) method.invoke(null, record, key);
     }
 }

@@ -2,252 +2,348 @@ package br.com.ecofy.ms_budgeting.adapters.in.sched;
 
 import br.com.ecofy.ms_budgeting.core.application.command.CleanupBudgetsCommand;
 import br.com.ecofy.ms_budgeting.core.port.in.CleanupBudgetsUseCase;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class BudgetCleanupSchedulerTest {
 
     private static final Instant FIXED_INSTANT =
-            Instant.parse("2026-06-25T03:00:00Z");
+            Instant.parse("2026-08-11T12:00:00Z");
 
-    private static final Clock FIXED_CLOCK =
-            Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
+    private static final LocalDate FIXED_DATE =
+            LocalDate.of(2026, 8, 11);
 
-    private final CleanupBudgetsUseCase useCase = mock(CleanupBudgetsUseCase.class);
-    private final BudgetingSchedulingProperties props = mock(BudgetingSchedulingProperties.class);
+    @Mock
+    private CleanupBudgetsUseCase useCase;
 
-    private final BudgetCleanupScheduler scheduler =
-            new BudgetCleanupScheduler(useCase, props, FIXED_CLOCK);
+    @Mock
+    private BudgetingSchedulingProperties props;
 
-    @Test
-    void shouldSkipCleanupWhenCleanupIsDisabled() {
-        when(props.isCleanupEnabled()).thenReturn(false);
+    private Clock clock;
 
-        scheduler.cleanup();
+    private BudgetCleanupScheduler scheduler;
 
-        verify(props).isCleanupEnabled();
-        verify(props, never()).getCleanupRetentionDays();
-        verifyNoInteractions(useCase);
+    @BeforeEach
+    void setUp() {
+        clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
+
+        scheduler = new BudgetCleanupScheduler(
+                useCase,
+                props,
+                clock
+        );
     }
 
     @Test
+    @DisplayName("Deve executar limpeza quando o agendamento estiver habilitado")
     void shouldExecuteCleanupWhenEnabled() {
+        // Arrange
+        int retentionDays = 90;
+
         when(props.isCleanupEnabled()).thenReturn(true);
-        when(props.getCleanupRetentionDays()).thenReturn(90);
+        when(props.getCleanupRetentionDays()).thenReturn(retentionDays);
 
-        stubSuccessfulCleanup(3L, 5L);
-
-        scheduler.cleanup();
+        when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
+                .thenAnswer(invocation ->
+                        mock(invocation.getMethod().getReturnType())
+                );
 
         ArgumentCaptor<CleanupBudgetsCommand> commandCaptor =
                 ArgumentCaptor.forClass(CleanupBudgetsCommand.class);
 
+        // Act
+        scheduler.cleanup();
+
+        // Assert
         verify(useCase).cleanup(commandCaptor.capture());
 
         CleanupBudgetsCommand command = commandCaptor.getValue();
 
-        assertNotNull(command);
-        assertNotNull(readAny(command, "runId", "getRunId"));
-        assertInstanceOf(UUID.class, readAny(command, "runId", "getRunId"));
-
-        assertEquals(
-                LocalDate.of(2026, 6, 25),
-                readAny(command, "referenceDate", "getReferenceDate")
-        );
-
-        assertEquals(
-                90,
-                readAny(command, "retentionDays", "cleanupRetentionDays", "getRetentionDays", "getCleanupRetentionDays")
-        );
+        assertThat(command.runId()).isNotNull();
+        assertThat(command.referenceDate()).isEqualTo(FIXED_DATE);
+        assertThat(command.retentionDays()).isEqualTo(retentionDays);
 
         verify(props).isCleanupEnabled();
         verify(props).getCleanupRetentionDays();
-
-        assertFalse(runningFlag().get());
+        verifyNoMoreInteractions(useCase);
     }
 
     @Test
-    void shouldSkipCleanupWhenAlreadyRunning() throws Exception {
-        when(props.isCleanupEnabled()).thenReturn(true);
+    @DisplayName("Deve ignorar limpeza quando o agendamento estiver desabilitado")
+    void shouldSkipCleanupWhenDisabled() {
+        // Arrange
+        when(props.isCleanupEnabled()).thenReturn(false);
 
-        runningFlag().set(true);
-
+        // Act
         scheduler.cleanup();
 
+        // Assert
         verify(props).isCleanupEnabled();
         verify(props, never()).getCleanupRetentionDays();
         verifyNoInteractions(useCase);
-
-        assertTrue(runningFlag().get());
-
-        runningFlag().set(false);
     }
 
     @Test
-    void shouldCatchUseCaseExceptionAndReleaseRunningFlag() {
+    @DisplayName("Deve impedir uma segunda execução enquanto a limpeza já estiver em andamento")
+    void shouldSkipSecondExecutionWhenCleanupIsAlreadyRunning() throws Exception {
+        // Arrange
+        when(props.isCleanupEnabled()).thenReturn(true);
+        when(props.getCleanupRetentionDays()).thenReturn(30);
+
+        CountDownLatch cleanupStarted = new CountDownLatch(1);
+        CountDownLatch releaseCleanup = new CountDownLatch(1);
+
+        when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
+                .thenAnswer(invocation -> {
+                    cleanupStarted.countDown();
+
+                    if (!releaseCleanup.await(5, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException(
+                                "Timeout aguardando liberação do teste"
+                        );
+                    }
+
+                    return mock(invocation.getMethod().getReturnType());
+                });
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        try {
+            Future<?> firstExecution = executor.submit(scheduler::cleanup);
+
+            assertThat(cleanupStarted.await(5, TimeUnit.SECONDS))
+                    .isTrue();
+
+            // Act
+            scheduler.cleanup();
+
+            // Assert
+            verify(useCase, times(1))
+                    .cleanup(any(CleanupBudgetsCommand.class));
+
+            releaseCleanup.countDown();
+
+            firstExecution.get(5, TimeUnit.SECONDS);
+
+            verify(useCase, times(1))
+                    .cleanup(any(CleanupBudgetsCommand.class));
+        } finally {
+            releaseCleanup.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("Deve capturar exceção da limpeza sem propagá-la")
+    void shouldHandleCleanupExceptionWithoutPropagating() {
+        // Arrange
+        when(props.isCleanupEnabled()).thenReturn(true);
+        when(props.getCleanupRetentionDays()).thenReturn(60);
+
+        RuntimeException exception =
+                new RuntimeException("Falha ao limpar orçamentos");
+
+        when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
+                .thenThrow(exception);
+
+        // Act
+        scheduler.cleanup();
+
+        // Assert
+        verify(useCase).cleanup(any(CleanupBudgetsCommand.class));
+    }
+
+    @Test
+    @DisplayName("Deve liberar nova execução após ocorrer uma exceção")
+    void shouldAllowNewExecutionAfterException() {
+        // Arrange
+        when(props.isCleanupEnabled()).thenReturn(true);
+        when(props.getCleanupRetentionDays()).thenReturn(45);
+
+        RuntimeException exception =
+                new RuntimeException("Falha temporária");
+
+        when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
+                .thenThrow(exception)
+                .thenAnswer(invocation ->
+                        mock(invocation.getMethod().getReturnType())
+                );
+
+        // Act
+        scheduler.cleanup();
+        scheduler.cleanup();
+
+        // Assert
+        verify(useCase, times(2))
+                .cleanup(any(CleanupBudgetsCommand.class));
+    }
+
+    @Test
+    @DisplayName("Deve liberar nova execução após concluir a limpeza com sucesso")
+    void shouldAllowNewExecutionAfterSuccessfulCleanup() {
+        // Arrange
         when(props.isCleanupEnabled()).thenReturn(true);
         when(props.getCleanupRetentionDays()).thenReturn(30);
 
         when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
-                .thenThrow(new RuntimeException("database unavailable"));
+                .thenAnswer(invocation ->
+                        mock(invocation.getMethod().getReturnType())
+                );
 
-        assertDoesNotThrow(scheduler::cleanup);
-
-        verify(useCase).cleanup(any(CleanupBudgetsCommand.class));
-
-        assertFalse(runningFlag().get());
-    }
-
-    @Test
-    void shouldReleaseRunningFlagAfterSuccessfulExecution() {
-        when(props.isCleanupEnabled()).thenReturn(true);
-        when(props.getCleanupRetentionDays()).thenReturn(15);
-
-        stubSuccessfulCleanup(1L, 2L);
-
-        scheduler.cleanup();
-
-        verify(useCase).cleanup(any(CleanupBudgetsCommand.class));
-
-        assertFalse(runningFlag().get());
-    }
-
-    @Test
-    void shouldAllowNewExecutionAfterPreviousSuccessfulExecution() {
-        when(props.isCleanupEnabled()).thenReturn(true);
-        when(props.getCleanupRetentionDays()).thenReturn(45);
-
-        stubSuccessfulCleanup(2L, 4L);
-
+        // Act
         scheduler.cleanup();
         scheduler.cleanup();
 
-        verify(useCase, times(2)).cleanup(any(CleanupBudgetsCommand.class));
-
-        assertFalse(runningFlag().get());
+        // Assert
+        verify(useCase, times(2))
+                .cleanup(any(CleanupBudgetsCommand.class));
     }
 
     @Test
-    void shouldAllowNewExecutionAfterPreviousFailedExecution() {
+    @DisplayName("Deve gerar um identificador de execução diferente a cada limpeza")
+    void shouldGenerateDifferentRunIdForEachCleanup() {
+        // Arrange
         when(props.isCleanupEnabled()).thenReturn(true);
-        when(props.getCleanupRetentionDays()).thenReturn(60);
+        when(props.getCleanupRetentionDays()).thenReturn(30);
 
-        when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
-                .thenThrow(new RuntimeException("first failure"))
-                .thenAnswer(invocation -> cleanupResult(invocation.getMethod().getReturnType(), 10L, 20L));
-
-        assertDoesNotThrow(scheduler::cleanup);
-        assertDoesNotThrow(scheduler::cleanup);
-
-        verify(useCase, times(2)).cleanup(any(CleanupBudgetsCommand.class));
-
-        assertFalse(runningFlag().get());
-    }
-
-    private void stubSuccessfulCleanup(long budgetsDeleted, long consumptionsDeleted) {
         when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
                 .thenAnswer(invocation ->
-                        cleanupResult(
-                                invocation.getMethod().getReturnType(),
-                                budgetsDeleted,
-                                consumptionsDeleted
-                        )
+                        mock(invocation.getMethod().getReturnType())
                 );
+
+        ArgumentCaptor<CleanupBudgetsCommand> commandCaptor =
+                ArgumentCaptor.forClass(CleanupBudgetsCommand.class);
+
+        // Act
+        scheduler.cleanup();
+        scheduler.cleanup();
+
+        // Assert
+        verify(useCase, times(2))
+                .cleanup(commandCaptor.capture());
+
+        assertThat(commandCaptor.getAllValues())
+                .hasSize(2);
+
+        assertThat(commandCaptor.getAllValues().get(0).runId())
+                .isNotNull()
+                .isNotEqualTo(commandCaptor.getAllValues().get(1).runId());
+
+        assertThat(commandCaptor.getAllValues().get(1).runId())
+                .isNotNull();
     }
 
-    private static Object cleanupResult(
-            Class<?> returnType,
-            long budgetsDeleted,
-            long consumptionsDeleted
-    ) throws Exception {
-        for (Constructor<?> constructor : returnType.getDeclaredConstructors()) {
-            Class<?>[] parameterTypes = constructor.getParameterTypes();
-
-            if (parameterTypes.length == 2
-                    && isNumericType(parameterTypes[0])
-                    && isNumericType(parameterTypes[1])) {
-
-                constructor.setAccessible(true);
-
-                return constructor.newInstance(
-                        numericValue(parameterTypes[0], budgetsDeleted),
-                        numericValue(parameterTypes[1], consumptionsDeleted)
-                );
-            }
-        }
-
-        return mock(returnType, invocation -> {
-            String methodName = invocation.getMethod().getName();
-            Class<?> methodReturnType = invocation.getMethod().getReturnType();
-
-            if ("budgetsDeleted".equals(methodName)) {
-                return numericValue(methodReturnType, budgetsDeleted);
-            }
-
-            if ("consumptionsDeleted".equals(methodName)) {
-                return numericValue(methodReturnType, consumptionsDeleted);
-            }
-
-            return RETURNS_DEFAULTS.answer(invocation);
-        });
-    }
-
-    private static boolean isNumericType(Class<?> type) {
-        return type == long.class
-                || type == Long.class
-                || type == int.class
-                || type == Integer.class;
-    }
-
-    private static Object numericValue(Class<?> type, long value) {
-        if (type == int.class || type == Integer.class) {
-            return (int) value;
-        }
-
-        return value;
-    }
-
-    private AtomicBoolean runningFlag() {
-        try {
-            Field field = BudgetCleanupScheduler.class.getDeclaredField("running");
-            field.setAccessible(true);
-            return (AtomicBoolean) field.get(scheduler);
-        } catch (Exception exception) {
-            throw new AssertionError("Failed to access running flag", exception);
-        }
-    }
-
-    private static Object readAny(Object target, String... methodNames) {
-        for (String methodName : methodNames) {
-            try {
-                Method method = target.getClass().getMethod(methodName);
-                return method.invoke(target);
-            } catch (NoSuchMethodException ignored) {
-                // tenta próximo nome
-            } catch (Exception exception) {
-                throw new AssertionError("Failed to read method: " + methodName, exception);
-            }
-        }
-
-        throw new AssertionError(
-                "None of the methods exist on "
-                        + target.getClass().getName()
-                        + ": "
-                        + String.join(", ", methodNames)
+    @Test
+    @DisplayName("Deve utilizar a data atual do relógio configurado como referência")
+    void shouldUseCurrentDateFromConfiguredClock() {
+        // Arrange
+        Clock customClock = Clock.fixed(
+                Instant.parse("2030-12-25T15:30:00Z"),
+                ZoneOffset.UTC
         );
+
+        BudgetCleanupScheduler customScheduler =
+                new BudgetCleanupScheduler(
+                        useCase,
+                        props,
+                        customClock
+                );
+
+        when(props.isCleanupEnabled()).thenReturn(true);
+        when(props.getCleanupRetentionDays()).thenReturn(120);
+
+        when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
+                .thenAnswer(invocation ->
+                        mock(invocation.getMethod().getReturnType())
+                );
+
+        ArgumentCaptor<CleanupBudgetsCommand> commandCaptor =
+                ArgumentCaptor.forClass(CleanupBudgetsCommand.class);
+
+        // Act
+        customScheduler.cleanup();
+
+        // Assert
+        verify(useCase).cleanup(commandCaptor.capture());
+
+        assertThat(commandCaptor.getValue().referenceDate())
+                .isEqualTo(LocalDate.of(2030, 12, 25));
+
+        assertThat(commandCaptor.getValue().retentionDays())
+                .isEqualTo(120);
+
+        assertThat(commandCaptor.getValue().runId())
+                .isNotNull();
+    }
+
+    @Test
+    @DisplayName("Deve encaminhar zero como período de retenção quando configurado")
+    void shouldForwardZeroRetentionDaysWhenConfigured() {
+        // Arrange
+        when(props.isCleanupEnabled()).thenReturn(true);
+        when(props.getCleanupRetentionDays()).thenReturn(0);
+
+        when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
+                .thenAnswer(invocation ->
+                        mock(invocation.getMethod().getReturnType())
+                );
+
+        ArgumentCaptor<CleanupBudgetsCommand> commandCaptor =
+                ArgumentCaptor.forClass(CleanupBudgetsCommand.class);
+
+        // Act
+        scheduler.cleanup();
+
+        // Assert
+        verify(useCase).cleanup(commandCaptor.capture());
+
+        assertThat(commandCaptor.getValue().retentionDays())
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("Deve liberar nova execução após erro causado por período de retenção negativo")
+    void shouldAllowNewExecutionAfterInvalidRetentionDays() {
+        // Arrange
+        when(props.isCleanupEnabled()).thenReturn(true);
+        when(props.getCleanupRetentionDays())
+                .thenReturn(-1)
+                .thenReturn(30);
+
+        when(useCase.cleanup(any(CleanupBudgetsCommand.class)))
+                .thenAnswer(invocation ->
+                        mock(invocation.getMethod().getReturnType())
+                );
+
+        // Act
+        scheduler.cleanup();
+        scheduler.cleanup();
+
+        // Assert
+        verify(props, times(2)).isCleanupEnabled();
+        verify(props, times(2)).getCleanupRetentionDays();
+
+        verify(useCase, times(1))
+                .cleanup(any(CleanupBudgetsCommand.class));
     }
 }

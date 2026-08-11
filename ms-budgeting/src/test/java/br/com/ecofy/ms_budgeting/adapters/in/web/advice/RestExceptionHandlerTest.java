@@ -39,6 +39,7 @@ class RestExceptionHandlerTest {
         assertErrorResponse(
                 response,
                 HttpStatus.NOT_FOUND,
+                "BUDGET_NOT_FOUND",
                 exception.getMessage(),
                 "/api/v1/budgets/123",
                 "trace-001",
@@ -61,10 +62,11 @@ class RestExceptionHandlerTest {
         assertErrorResponse(
                 response,
                 HttpStatus.CONFLICT,
+                "BUDGET_ALREADY_EXISTS",
                 exception.getMessage(),
                 "/api/v1/budgets",
                 "correlation-001",
-                Map.of("reason", "BUDGET_ALREADY_EXISTS")
+                Map.of()
         );
     }
 
@@ -82,10 +84,11 @@ class RestExceptionHandlerTest {
         assertErrorResponse(
                 response,
                 HttpStatus.CONFLICT,
+                "DUPLICATE_EVENT",
                 exception.getMessage(),
                 "/api/v1/budgets/process",
                 "trace-002",
-                Map.of("reason", "IDEMPOTENCY_VIOLATION")
+                Map.of()
         );
     }
 
@@ -102,10 +105,11 @@ class RestExceptionHandlerTest {
         assertErrorResponse(
                 response,
                 HttpStatus.BAD_REQUEST,
+                "VALIDATION_ERROR",
                 "Invalid business rule",
                 "/api/v1/budgets",
                 null,
-                Map.of("reason", "BUSINESS_VALIDATION")
+                Map.of()
         );
     }
 
@@ -127,7 +131,8 @@ class RestExceptionHandlerTest {
         assertNotNull(body);
         assertNotNull(body.timestamp());
         assertEquals(HttpStatus.BAD_REQUEST.value(), body.status());
-        assertEquals(HttpStatus.BAD_REQUEST.getReasonPhrase(), body.error());
+        // COMP-006: código de negócio no topo (errorCode); details só com os campos.
+        assertEquals("VALIDATION_ERROR", body.errorCode());
         assertEquals("Invalid payload", body.message());
         assertEquals("/api/v1/budgets", body.path());
         assertEquals("trace-validation-001", body.traceId());
@@ -156,7 +161,8 @@ class RestExceptionHandlerTest {
         assertErrorResponse(
                 response,
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                "Unexpected error",
+                "INTERNAL_SERVER_ERROR",
+                "Ocorreu um erro interno ao processar a solicitação.",
                 "/api/v1/budgets/recalculate",
                 "correlation-generic-001",
                 Map.of()
@@ -185,6 +191,7 @@ class RestExceptionHandlerTest {
     private static void assertErrorResponse(
             ResponseEntity<ApiErrorResponse> response,
             HttpStatus expectedStatus,
+            String expectedErrorCode,
             String expectedMessage,
             String expectedPath,
             String expectedTraceId,
@@ -197,7 +204,7 @@ class RestExceptionHandlerTest {
         assertNotNull(body);
         assertNotNull(body.timestamp());
         assertEquals(expectedStatus.value(), body.status());
-        assertEquals(expectedStatus.getReasonPhrase(), body.error());
+        assertEquals(expectedErrorCode, body.errorCode());
         assertEquals(expectedMessage, body.message());
         assertEquals(expectedPath, body.path());
         assertEquals(expectedTraceId, body.traceId());

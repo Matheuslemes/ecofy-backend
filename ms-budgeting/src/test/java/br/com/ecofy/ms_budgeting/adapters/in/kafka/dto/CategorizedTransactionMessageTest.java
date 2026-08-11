@@ -1,54 +1,55 @@
 package br.com.ecofy.ms_budgeting.adapters.in.kafka.dto;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class CategorizedTransactionMessageTest {
 
-    private static final UUID TRANSACTION_ID =
-            UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-
-    private static final UUID USER_ID =
-            UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
-
-    private static final UUID CATEGORY_ID =
-            UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
-
-    private static final BigDecimal AMOUNT = BigDecimal.valueOf(150.75);
-    private static final String CURRENCY = "BRL";
-    private static final LocalDate TRANSACTION_DATE = LocalDate.of(2026, 6, 25);
-
     @Test
-    void shouldCreateCategorizedTransactionMessageWithAllFields() {
-        MessageMetadata metadata = metadata();
+    @DisplayName("Deve criar mensagem com todos os campos preenchidos")
+    void shouldCreateMessageWithAllFields() {
+        // Arrange
+        UUID transactionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("150.75");
+        String currency = "BRL";
+        LocalDate transactionDate = LocalDate.of(2026, 8, 11);
+        MessageMetadata metadata = null;
 
+        // Act
         CategorizedTransactionMessage message = new CategorizedTransactionMessage(
-                TRANSACTION_ID,
-                USER_ID,
-                CATEGORY_ID,
-                AMOUNT,
-                CURRENCY,
-                TRANSACTION_DATE,
+                transactionId,
+                userId,
+                categoryId,
+                amount,
+                currency,
+                transactionDate,
                 metadata
         );
 
-        assertEquals(TRANSACTION_ID, message.transactionId());
-        assertEquals(USER_ID, message.userId());
-        assertEquals(CATEGORY_ID, message.categoryId());
-        assertEquals(AMOUNT, message.amount());
-        assertEquals(CURRENCY, message.currency());
-        assertEquals(TRANSACTION_DATE, message.transactionDate());
-        assertSame(metadata, message.metadata());
+        // Assert
+        assertThat(message.transactionId()).isEqualTo(transactionId);
+        assertThat(message.userId()).isEqualTo(userId);
+        assertThat(message.categoryId()).isEqualTo(categoryId);
+        assertThat(message.amount()).isEqualByComparingTo(amount);
+        assertThat(message.currency()).isEqualTo(currency);
+        assertThat(message.transactionDate()).isEqualTo(transactionDate);
+        assertThat(message.metadata()).isNull();
     }
 
     @Test
-    void shouldCreateCategorizedTransactionMessageWithNullFields() {
+    @DisplayName("Deve permitir criação da mensagem com todos os campos nulos")
+    void shouldAllowCreationWithAllFieldsNull() {
+        // Arrange
+
+        // Act
         CategorizedTransactionMessage message = new CategorizedTransactionMessage(
                 null,
                 null,
@@ -59,138 +60,156 @@ class CategorizedTransactionMessageTest {
                 null
         );
 
-        assertNull(message.transactionId());
-        assertNull(message.userId());
-        assertNull(message.categoryId());
-        assertNull(message.amount());
-        assertNull(message.currency());
-        assertNull(message.transactionDate());
-        assertNull(message.metadata());
+        // Assert
+        assertThat(message.transactionId()).isNull();
+        assertThat(message.userId()).isNull();
+        assertThat(message.categoryId()).isNull();
+        assertThat(message.amount()).isNull();
+        assertThat(message.currency()).isNull();
+        assertThat(message.transactionDate()).isNull();
+        assertThat(message.metadata()).isNull();
     }
 
     @Test
-    void shouldCompareMessagesByAllRecordComponents() {
-        MessageMetadata metadata = metadata();
+    @DisplayName("Deve considerar mensagens iguais quando todos os campos forem iguais")
+    void shouldConsiderMessagesEqualWhenAllFieldsAreEqual() {
+        // Arrange
+        UUID transactionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("99.90");
+        String currency = "BRL";
+        LocalDate transactionDate = LocalDate.of(2026, 8, 11);
 
-        CategorizedTransactionMessage message = new CategorizedTransactionMessage(
-                TRANSACTION_ID,
-                USER_ID,
-                CATEGORY_ID,
-                AMOUNT,
-                CURRENCY,
-                TRANSACTION_DATE,
-                metadata
+        CategorizedTransactionMessage first = new CategorizedTransactionMessage(
+                transactionId,
+                userId,
+                categoryId,
+                amount,
+                currency,
+                transactionDate,
+                null
         );
 
-        CategorizedTransactionMessage sameMessage = new CategorizedTransactionMessage(
-                TRANSACTION_ID,
-                USER_ID,
-                CATEGORY_ID,
-                AMOUNT,
-                CURRENCY,
-                TRANSACTION_DATE,
-                metadata
+        CategorizedTransactionMessage second = new CategorizedTransactionMessage(
+                transactionId,
+                userId,
+                categoryId,
+                amount,
+                currency,
+                transactionDate,
+                null
         );
 
-        CategorizedTransactionMessage differentMessage = new CategorizedTransactionMessage(
-                UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                USER_ID,
-                CATEGORY_ID,
-                AMOUNT,
-                CURRENCY,
-                TRANSACTION_DATE,
-                metadata
-        );
-
-        assertEquals(message, message);
-        assertEquals(message, sameMessage);
-        assertNotEquals(message, differentMessage);
-        assertNotEquals(message, null);
-        assertNotEquals(message, "not-a-message");
+        // Act / Assert
+        assertThat(first)
+                .isEqualTo(second)
+                .hasSameHashCodeAs(second);
     }
 
     @Test
-    void shouldGenerateHashCodeUsingAllRecordComponents() {
-        MessageMetadata metadata = metadata();
-
+    @DisplayName("Deve considerar a própria instância igual a ela mesma")
+    void shouldBeEqualToItself() {
+        // Arrange
         CategorizedTransactionMessage message = new CategorizedTransactionMessage(
-                TRANSACTION_ID,
-                USER_ID,
-                CATEGORY_ID,
-                AMOUNT,
-                CURRENCY,
-                TRANSACTION_DATE,
-                metadata
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                BigDecimal.TEN,
+                "BRL",
+                LocalDate.of(2026, 8, 11),
+                null
         );
 
-        CategorizedTransactionMessage sameMessage = new CategorizedTransactionMessage(
-                TRANSACTION_ID,
-                USER_ID,
-                CATEGORY_ID,
-                AMOUNT,
-                CURRENCY,
-                TRANSACTION_DATE,
-                metadata
-        );
-
-        assertEquals(message, sameMessage);
-        assertEquals(message.hashCode(), sameMessage.hashCode());
+        // Act / Assert
+        assertThat(message).isEqualTo(message);
     }
 
     @Test
-    void shouldNotBeEqualWhenMainComponentChanges() {
-        MessageMetadata metadata = metadata();
+    @DisplayName("Deve considerar mensagens diferentes quando algum campo for diferente")
+    void shouldConsiderMessagesDifferentWhenFieldDiffers() {
+        // Arrange
+        UUID transactionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        LocalDate transactionDate = LocalDate.of(2026, 8, 11);
 
-        CategorizedTransactionMessage message = new CategorizedTransactionMessage(
-                TRANSACTION_ID,
-                USER_ID,
-                CATEGORY_ID,
-                AMOUNT,
-                CURRENCY,
-                TRANSACTION_DATE,
-                metadata
+        CategorizedTransactionMessage first = new CategorizedTransactionMessage(
+                transactionId,
+                userId,
+                categoryId,
+                new BigDecimal("100.00"),
+                "BRL",
+                transactionDate,
+                null
         );
 
-        CategorizedTransactionMessage differentMessage = new CategorizedTransactionMessage(
-                UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                USER_ID,
-                CATEGORY_ID,
-                AMOUNT,
-                CURRENCY,
-                TRANSACTION_DATE,
-                metadata
+        CategorizedTransactionMessage second = new CategorizedTransactionMessage(
+                transactionId,
+                userId,
+                categoryId,
+                new BigDecimal("200.00"),
+                "BRL",
+                transactionDate,
+                null
         );
 
-        assertNotEquals(message, differentMessage);
+        // Act / Assert
+        assertThat(first).isNotEqualTo(second);
     }
 
     @Test
-    void shouldReturnToStringWithRecordComponents() {
-        MessageMetadata metadata = metadata();
-
+    @DisplayName("Deve ser diferente de nulo e de objeto de outro tipo")
+    void shouldNotBeEqualToNullOrDifferentType() {
+        // Arrange
         CategorizedTransactionMessage message = new CategorizedTransactionMessage(
-                TRANSACTION_ID,
-                USER_ID,
-                CATEGORY_ID,
-                AMOUNT,
-                CURRENCY,
-                TRANSACTION_DATE,
-                metadata
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                BigDecimal.ONE,
+                "BRL",
+                LocalDate.of(2026, 8, 11),
+                null
         );
 
+        // Act / Assert
+        assertThat(message).isNotEqualTo(null);
+        assertThat(message).isNotEqualTo("outro-objeto");
+    }
+
+    @Test
+    @DisplayName("Deve gerar representação textual contendo os valores dos campos")
+    void shouldGenerateToStringWithFieldValues() {
+        // Arrange
+        UUID transactionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("42.50");
+        String currency = "USD";
+        LocalDate transactionDate = LocalDate.of(2026, 8, 10);
+
+        CategorizedTransactionMessage message = new CategorizedTransactionMessage(
+                transactionId,
+                userId,
+                categoryId,
+                amount,
+                currency,
+                transactionDate,
+                null
+        );
+
+        // Act
         String result = message.toString();
 
-        assertTrue(result.contains("CategorizedTransactionMessage"));
-        assertTrue(result.contains("transactionId=" + TRANSACTION_ID));
-        assertTrue(result.contains("userId=" + USER_ID));
-        assertTrue(result.contains("categoryId=" + CATEGORY_ID));
-        assertTrue(result.contains("amount=" + AMOUNT));
-        assertTrue(result.contains("currency=" + CURRENCY));
-        assertTrue(result.contains("transactionDate=" + TRANSACTION_DATE));
-        assertTrue(result.contains("metadata="));
-    }
-
-    private static MessageMetadata metadata() {
-        return mock(MessageMetadata.class);
+        // Assert
+        assertThat(result)
+                .contains("CategorizedTransactionMessage")
+                .contains(transactionId.toString())
+                .contains(userId.toString())
+                .contains(categoryId.toString())
+                .contains(amount.toString())
+                .contains(currency)
+                .contains(transactionDate.toString())
+                .contains("metadata=null");
     }
 }
